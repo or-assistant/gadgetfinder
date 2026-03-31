@@ -47,8 +47,7 @@ PRICE_SEGMENTS = {
 SCORE_BADGES = [
     (80, "Hot",  "#e74c3c"),
     (60, "Good", "#c9a84c"),
-    (40, "Mid",  "#7f8c8d"),
-    (0,  "Low",  "#555"),
+    (0,  "",     ""),
 ]
 
 GADGET_CATEGORIES = {k: v for k, v in CATEGORY_MAP.items() if k != "ai"}
@@ -793,7 +792,7 @@ def render_hero(article, params):
       <span>{esc(article["source"])}</span>
       {brand_html}
       <span>{cat_info[1]} {cat_info[0]}</span>
-      <span class="hero-score" style="background:{badge_color}">{badge_label}</span>
+      {"<span class='hero-score' style='background:" + badge_color + "'>" + badge_label + "</span>" if badge_label else ""}
     </div>
   </div>
 </div>'''
@@ -830,7 +829,7 @@ def render_card(article):
       <span class="card-dot" style="background:{source_color}"></span>
       <span>{esc(article["source"])}</span>
       {brand_html}
-      <span class="badge badge-score" style="background:{badge_color}">{badge_label} {article["score"]}</span>
+      {"<span class='badge badge-score' style='background:" + badge_color + "'>" + badge_label + " " + str(article["score"]) + "</span>" if badge_label else ""}
       {new_html}
       <span>{date_str}{price_html}</span>
       <span class="card-vote">
