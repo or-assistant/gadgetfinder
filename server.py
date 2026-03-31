@@ -608,7 +608,7 @@ a{color:var(--text);text-decoration:none}
 .chip:hover{color:var(--text);border-color:var(--accent)}
 .chip.on{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:600}
 /* Hero card */
-.hero-row{display:grid;grid-template-columns:1fr;gap:12px;margin:16px 0}
+.hero-row{display:grid;grid-template-columns:1fr;gap:12px;margin:16px 0;align-items:start}
 @media(min-width:768px){.hero-row{grid-template-columns:1fr 1fr}}
 @media(min-width:1200px){.hero-row{grid-template-columns:2fr 1fr 1fr}}
 .hero{border-radius:16px;overflow:hidden;position:relative;background:var(--card);min-width:0}
