@@ -56,8 +56,16 @@ AI_SUBCATEGORIES = {
     "models":     ("\U0001f9e0 Modelle & Releases", [
         "gpt", "claude", "gemini", "llama", "mistral", "phi-", "qwen",
         "deepseek", "llm", "language model", "foundation model", "release",
-        "benchmark", "parameter", "fine-tun", "training", "inference",
+        "parameter", "fine-tun", "training",
         "token", "context window", "multimodal model", "vision model",
+    ]),
+    "benchmarks": ("\U0001f4ca Benchmarks", [
+        "benchmark", "leaderboard", "arena", "elo ", "ranking",
+        "mmlu", "humaneval", "hellaswag", "gpqa", "math ", "aime",
+        "lmsys", "chatbot arena", "open llm", "eval", "comparison",
+        "performance", "score ", "accuracy", "outperform", "beats",
+        "state of the art", "sota", "vs ", "head to head", "head-to-head",
+        "persuasion benchmark", "coding benchmark", "reasoning benchmark",
     ]),
     "agentic":    ("\U0001f916 Agentic AI", [
         "agent", "agentic", "autonomous", "tool use", "function call",
@@ -735,6 +743,7 @@ a{color:var(--text);text-decoration:none}
 TOPIC_EMOJIS = {
     # AI subcategories
     "models": ("\U0001f9e0", "#00897b", "#004d40"),
+    "benchmarks": ("\U0001f4ca", "#ff6f00", "#e65100"),
     "agentic": ("\U0001f916", "#1565c0", "#0d3d75"),
     "opensource": ("\U0001f310", "#2e7d32", "#1b4d1e"),
     "europe": ("\U0001f1ea\U0001f1fa", "#003399", "#001a4d"),
