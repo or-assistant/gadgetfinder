@@ -124,21 +124,37 @@ def detect_ai_subcategory(title, summary, source=""):
 
 
 def deduplicate_articles(articles):
-    """Fast dedup: first 8 words of title as key. O(n) instead of O(n²)."""
+    """Multi-strategy dedup: first-6-words key + 4-word overlap check."""
     result = []
-    seen = {}
+    seen_keys = {}     # first 6 words -> article
+    seen_4w = set()    # 4-word sequences for cross-source dedup
     for a in articles:
-        # Key: first 8 words lowercased, stripped of punctuation
-        words = re.sub(r'[^\w\s]', '', a["title"].lower()).split()[:8]
-        key = " ".join(words)
-        if key in seen:
-            # Keep higher score
-            if a.get("score", 0) > seen[key].get("score", 0):
-                result = [a if r is seen[key] else r for r in result]
-                seen[key] = a
-        else:
-            seen[key] = a
-            result.append(a)
+        words = re.sub(r'[^\w\s]', '', a["title"].lower()).split()
+        # Strategy 1: first 6 words as primary key
+        key6 = " ".join(words[:6])
+        if key6 in seen_keys:
+            if a.get("score", 0) > seen_keys[key6].get("score", 0):
+                result = [a if r is seen_keys[key6] else r for r in result]
+                seen_keys[key6] = a
+            continue
+        # Strategy 2: check for 4-word overlapping sequences (catches Google News dupes)
+        found_dup = False
+        if len(words) >= 4:
+            for i in range(min(len(words) - 3, 6)):  # check first 6 positions
+                seq = " ".join(words[i:i+4])
+                if seq in seen_4w and len(seq) > 12:  # skip short generic sequences
+                    found_dup = True
+                    break
+        if found_dup:
+            continue
+        # Record sequences
+        if len(words) >= 4:
+            for i in range(min(len(words) - 3, 8)):
+                seq = " ".join(words[i:i+4])
+                if len(seq) > 12:
+                    seen_4w.add(seq)
+        seen_keys[key6] = a
+        result.append(a)
     return result
 
 # ---------------------------------------------------------------------------
@@ -212,6 +228,15 @@ def compute_score(title, summary, source, brand, image_url, cfg):
     # Reddit community bonus
     if source.startswith('r/'):
         s += _POPULAR_SUBS.get(source, 5)
+    # Reddit noise penalty: personal posts, questions, low-effort
+    _REDDIT_NOISE = ['i just want', 'how are you', 'what do you think',
+                     'is it worth', 'should i ', 'help me ', 'does anyone',
+                     'am i the only', 'tips on ', 'has anyone']
+    if source.startswith('r/'):
+        for rn in _REDDIT_NOISE:
+            if rn in text:
+                s -= 25
+                break
     return max(0, min(200, s))
 
 # ---------------------------------------------------------------------------
@@ -325,9 +350,11 @@ def is_noise(title, cfg):
 def fetch_feeds():
     cfg = load_config()
     db = get_db()
-    # Auto-cleanup: delete articles older than 7 days
-    cutoff = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
-    db.execute("DELETE FROM articles WHERE published < ?", (cutoff,))
+    # Auto-cleanup: delete articles older than 5 days, or low-score after 2 days
+    cutoff_5d = (datetime.now(timezone.utc) - timedelta(days=5)).isoformat()
+    cutoff_2d = (datetime.now(timezone.utc) - timedelta(days=2)).isoformat()
+    db.execute("DELETE FROM articles WHERE published < ?", (cutoff_5d,))
+    db.execute("DELETE FROM articles WHERE published < ? AND score < 40 AND vote = 0", (cutoff_2d,))
     db.commit()
     added = 0
     for feed_cfg in cfg["feeds"]:
@@ -396,6 +423,9 @@ def fetch_feeds():
             if source.startswith("r/"):
                 position_bonus = max(0, 25 - entry_idx)  # #1 = +25, #10 = +15, #25 = 0
                 score += position_bonus
+            # Skip very low-quality articles
+            if score < 15:
+                continue
             try:
                 db.execute(
                     "INSERT INTO articles (id,title,url,source,category,brand,summary,image_url,published,fetched,score) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
@@ -730,8 +760,9 @@ def index(request: Request):
     cfg = load_config()
     db = get_db()
 
-    rows = db.execute("SELECT * FROM articles ORDER BY score DESC, published DESC LIMIT 300").fetchall()
+    rows = db.execute("SELECT * FROM articles ORDER BY score DESC, published DESC LIMIT 500").fetchall()
     all_articles = []
+    now_ts = datetime.now(timezone.utc)
     for r in rows:
         a = dict(r)
         # Vote boost: Oliver's ratings override algorithm
@@ -740,6 +771,27 @@ def index(request: Request):
             a["score"] = a.get("score", 0) + 50
         elif vote == -1:
             a["score"] = max(0, a.get("score", 0) - 30)
+        # Recency boost: fresh articles get significant boost, old ones decay
+        try:
+            pub = datetime.fromisoformat(a.get("published", ""))
+            if pub.tzinfo is None:
+                pub = pub.replace(tzinfo=timezone.utc)
+            age_hours = (now_ts - pub).total_seconds() / 3600
+            if age_hours < 6:
+                a["score"] += 30      # Breaking: massive boost
+            elif age_hours < 12:
+                a["score"] += 20      # Very fresh
+            elif age_hours < 24:
+                a["score"] += 12      # Today
+            elif age_hours < 48:
+                a["score"] += 5       # Yesterday: small boost
+            elif age_hours > 96:
+                a["score"] -= 15      # Older than 4 days: decay
+        except (ValueError, TypeError):
+            pass
+        # Minimum display threshold: skip very low-quality
+        if a["score"] < 25 and vote != 1:
+            continue
         all_articles.append(a)
     db.close()
 
