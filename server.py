@@ -461,19 +461,32 @@ def strip_dashes(s):
     return s.replace("\u2014", " ").replace("\u2013", " ") if s else s
 
 def clean_reddit_title(title, source):
-    """Truncate Reddit titles to first sentence if too long."""
-    if not source.startswith("r/") or len(title) <= 120:
+    """Clean Reddit titles: remove tags, truncate to headline length (max ~80 chars)."""
+    if not source.startswith("r/"):
         return title
-    # Cut at first sentence boundary
-    for sep in ['. ', '! ', '? ', ' — ', ' - ', ': ']:
-        idx = title.find(sep)
-        if 20 < idx < 140:
-            return title[:idx + 1].rstrip()
-    # Fallback: cut at 120 chars on word boundary
-    if len(title) > 120:
-        cut = title[:120].rsplit(' ', 1)[0]
-        return cut + "…"
-    return title
+    t = title.strip()
+    # Remove Reddit tags like [R], [D], [P], [N]
+    t = re.sub(r'^\[([RDPN])\]\s*', '', t)
+    # Already short enough
+    if len(t) <= 80:
+        return t
+    # Cut at first sentence boundary (prefer short)
+    for sep in ['. ', '! ', '? ', ' — ', ' - ']:
+        idx = t.find(sep)
+        if 15 < idx <= 80:
+            return t[:idx + 1].rstrip()
+    # Cut at colon if it's a headline pattern ("Topic: details")
+    colon = t.find(': ')
+    if 10 < colon <= 60:
+        return t[:colon]
+    # Cut at pipe/dash separator
+    for sep in [' | ', ' — ', ' - ']:
+        idx = t.find(sep)
+        if 15 < idx <= 80:
+            return t[:idx]
+    # Fallback: word boundary at 80 chars
+    cut = t[:80].rsplit(' ', 1)[0]
+    return cut + "…"
 
 def format_date(iso):
     try:
