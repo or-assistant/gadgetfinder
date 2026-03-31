@@ -677,13 +677,11 @@ a{color:var(--text);text-decoration:none}
 @media(min-width:768px){.hero-row{grid-template-columns:1fr 1fr}}
 @media(min-width:1200px){.hero-row{grid-template-columns:2fr 1fr 1fr}}
 .hero{border-radius:16px;overflow:hidden;position:relative;background:var(--card);min-width:0}
-.hero-img-wrap{position:relative;width:100%;aspect-ratio:16/9;overflow:hidden}
+.hero-img-wrap{position:relative;width:100%;overflow:hidden}
 .hero img{width:100%;height:100%;object-fit:cover;display:block}
-.hero-placeholder{width:100%;aspect-ratio:16/9;display:flex;align-items:center;
-  justify-content:center;font-size:64px}
-.hero-overlay{position:absolute;bottom:0;left:0;right:0;
-  padding:20px 16px 14px;
-  background:linear-gradient(transparent,rgba(0,0,0,0.85))}
+.hero-placeholder{width:100%;padding:20px 0;display:flex;align-items:center;
+  justify-content:center;font-size:40px}
+.hero-overlay{padding:12px 16px 14px}
 .hero-overlay h2{font-size:20px;font-weight:700;line-height:1.3;color:#fff;margin-bottom:6px}
 .hero-overlay h2 a{color:#fff}
 .hero-overlay-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px;color:rgba(255,255,255,0.7)}
@@ -896,6 +894,8 @@ def index(request: Request):
                 a["score"] -= 15
         except (ValueError, TypeError):
             pass
+        # Cap display score at 100
+        a["score"] = min(100, a["score"])
         # Minimum display threshold: skip very low-quality
         if a["score"] < 25 and vote != 1:
             continue
