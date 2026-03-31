@@ -639,7 +639,11 @@ body{background:var(--bg);color:var(--text);
   font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;
   overflow-x:hidden}
 a{color:var(--text);text-decoration:none}
-.wrap{max-width:1280px;margin:0 auto;padding:0 16px 48px;overflow:hidden}
+.wrap{max-width:960px;margin:0 auto;padding:0 16px 48px;overflow:hidden}
+@media(min-width:1200px){.wrap{max-width:1200px;display:grid;grid-template-columns:1fr 320px;gap:24px}}
+.main-col{min-width:0}
+.sidebar{display:none}
+@media(min-width:1200px){.sidebar{display:block;position:sticky;top:70px;align-self:start}}
 /* Header */
 .topbar{position:sticky;top:0;z-index:200;
   backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
@@ -735,10 +739,19 @@ a{color:var(--text);text-decoration:none}
   justify-content:center;font-size:15px;flex-shrink:0}
 .compact-title{flex:1;font-size:14px;font-weight:500;line-height:1.4;min-width:0;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-@media(min-width:768px){.compact-title{white-space:normal;display:-webkit-box;
-  -webkit-line-clamp:1;-webkit-box-orient:vertical}}
 .compact-meta{display:flex;align-items:center;gap:6px;flex-shrink:0;font-size:11px;color:var(--secondary)}
 .compact-source{max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* Sidebar */
+.sb-section{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:12px}
+.sb-title{font-size:13px;font-weight:700;color:var(--text);margin-bottom:12px;letter-spacing:.02em}
+.sb-item{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--border);
+  text-decoration:none;color:var(--text);transition:opacity .15s}
+.sb-item:last-child{border-bottom:none}
+.sb-item:hover{opacity:.7}
+.sb-num{font-size:14px;font-weight:700;color:var(--accent);min-width:18px;flex-shrink:0;line-height:1.4}
+.sb-item-title{font-size:13px;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.sb-stat{font-size:12px;color:var(--secondary);padding:4px 0;border-bottom:1px solid var(--border)}
+.sb-stat:last-child{border-bottom:none}
 /* Load more */
 .load-more{display:block;width:100%;padding:10px;margin:8px 0 16px;border:1px solid var(--border);
   border-radius:8px;background:transparent;color:var(--secondary);font-family:inherit;
@@ -1088,6 +1101,7 @@ def index(request: Request):
             parts.append('</div>')
 
     parts.append('<div class="wrap">')
+    parts.append('<div class="main-col">')
 
     if not feed:
         parts.append('<div class="empty">Keine Artikel gefunden. Versuche andere Filter.</div>')
@@ -1136,9 +1150,34 @@ def index(request: Request):
   <a href="{BASE_PATH}/refresh">Aktualisieren</a> &middot;
   <a href="{BASE_PATH}/stats">Quellen-Report</a>
 </div>
-</div>
+</div><!-- /main-col -->''')
 
-<script>
+    # Sidebar (desktop only): trending topics + hot articles
+    hot_articles = [a for a in feed[:20] if a.get("score", 0) >= 80][:5]
+    sidebar_parts = ['<aside class="sidebar">']
+    sidebar_parts.append('<div class="sb-section">')
+    sidebar_parts.append(f'<div class="sb-title">\U0001f525 {"Trending" if active_tab == "ai" else "Top Gadgets"}</div>')
+    for i, a in enumerate(hot_articles):
+        t = esc(strip_dashes(clean_reddit_title(a["title"], a.get("source", ""))))
+        emoji_i, c1_i, c2_i = get_article_emoji(a)
+        sidebar_parts.append(f'''<a href="{esc(a["url"])}" target="_blank" rel="noopener" class="sb-item">
+  <span class="sb-num">{i+1}</span>
+  <span class="sb-item-title">{t}</span>
+</a>''')
+    sidebar_parts.append('</div>')
+
+    # Quick stats
+    sidebar_parts.append('<div class="sb-section">')
+    sidebar_parts.append(f'<div class="sb-title">\U0001f4ca Quick Stats</div>')
+    sidebar_parts.append(f'<div class="sb-stat">{len(feed)} Artikel</div>')
+    sidebar_parts.append(f'<div class="sb-stat">{feed_count} Quellen</div>')
+    sidebar_parts.append(f'<div class="sb-stat">{len(hot_articles)} Hot Stories</div>')
+    sidebar_parts.append('</div>')
+    sidebar_parts.append('</aside>')
+    parts.append("".join(sidebar_parts))
+    parts.append('</div><!-- /wrap -->')
+
+    parts.append('''<script>
 (function(){{
   var html=document.documentElement;
   var saved=localStorage.getItem('gf-theme');
