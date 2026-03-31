@@ -299,6 +299,17 @@ def extract_price(title, summary):
 # Noise filter
 # ---------------------------------------------------------------------------
 
+# Source blocklist: these generate too much low-value content via Google News
+_SOURCE_BLOCKLIST = {
+    "the motley fool", "motley fool", "yahoo finance", "aol.com",
+    "cureus", "seeking alpha", "benzinga", "investopedia",
+    "the globe and mail",  # syndicated Motley Fool
+}
+
+def _is_blocked_source(source_name):
+    """Check if article comes from a blocked source (via Google/Bing News)."""
+    return source_name.lower().strip() in _SOURCE_BLOCKLIST
+
 def is_noise(title, cfg):
     t = title.lower()
     noise_hit = any(p in t for p in cfg["noise_patterns"])
@@ -336,6 +347,16 @@ def fetch_feeds():
                 continue
             summary_raw = getattr(entry, "summary", "") or ""
             summary = re.sub(r"<[^>]+>", "", summary_raw)[:300].strip()
+            # For aggregator feeds (Google/Bing News), use original source name
+            original_source = getattr(entry, "source", {})
+            if hasattr(original_source, "get"):
+                orig_name = original_source.get("title", "")
+            elif hasattr(original_source, "title"):
+                orig_name = original_source.title
+            else:
+                orig_name = str(original_source) if original_source else ""
+            if orig_name and _is_blocked_source(orig_name):
+                continue
             source = feed_cfg["name"]
             brand = detect_brand(title, summary, cfg)
             category = detect_category(title, summary, source, cfg)

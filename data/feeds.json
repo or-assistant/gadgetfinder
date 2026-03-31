@@ -534,6 +534,131 @@
       "name": "Tech.eu",
       "url": "https://tech.eu/feed/",
       "tier": 2
+    },
+    {
+      "name": "Google News AI",
+      "url": "https://news.google.com/rss/search?q=artificial+intelligence+OR+machine+learning+OR+LLM&hl=en&gl=US&ceid=US:en",
+      "tier": 2
+    },
+    {
+      "name": "Google News Gadgets",
+      "url": "https://news.google.com/rss/search?q=gadget+review+OR+tech+review+OR+new+device&hl=en&gl=US&ceid=US:en",
+      "tier": 2
+    },
+    {
+      "name": "Google News Quantum",
+      "url": "https://news.google.com/rss/search?q=quantum+computing+OR+quantum+processor&hl=en&gl=US&ceid=US:en",
+      "tier": 2
+    },
+    {
+      "name": "Google News KI DE",
+      "url": "https://news.google.com/rss/search?q=k%C3%BCnstliche+intelligenz+OR+KI+startup&hl=de&gl=DE&ceid=DE:de",
+      "tier": 2
+    },
+    {
+      "name": "Google News AI Agents",
+      "url": "https://news.google.com/rss/search?q=%22AI+agent%22+OR+%22agentic+AI%22+OR+%22autonomous+AI%22&hl=en&gl=US&ceid=US:en",
+      "tier": 2
+    },
+    {
+      "name": "Google News Open Source AI",
+      "url": "https://news.google.com/rss/search?q=%22open+source%22+AI+model+OR+Hugging+Face+OR+Ollama&hl=en&gl=US&ceid=US:en",
+      "tier": 2
+    },
+    {
+      "name": "Google News AI Hardware",
+      "url": "https://news.google.com/rss/search?q=NVIDIA+GPU+OR+AI+chip+OR+TPU+OR+neural+processor&hl=en&gl=US&ceid=US:en",
+      "tier": 2
+    },
+    {
+      "name": "Google News VR AR",
+      "url": "https://news.google.com/rss/search?q=VR+headset+OR+AR+glasses+OR+mixed+reality+OR+Vision+Pro&hl=en&gl=US&ceid=US:en",
+      "tier": 2
+    },
+    {
+      "name": "Bing News AI",
+      "url": "https://www.bing.com/news/search?q=artificial+intelligence+breakthrough&format=rss",
+      "tier": 3
+    },
+    {
+      "name": "Bing News Gadgets",
+      "url": "https://www.bing.com/news/search?q=new+gadget+review+2026&format=rss",
+      "tier": 3
+    },
+    {
+      "name": "Techmeme",
+      "url": "https://www.techmeme.com/feed.xml",
+      "tier": 1
+    },
+    {
+      "name": "Lobsters",
+      "url": "https://lobste.rs/rss",
+      "tier": 2
+    },
+    {
+      "name": "Lobsters AI",
+      "url": "https://lobste.rs/t/ai.rss",
+      "tier": 2
+    },
+    {
+      "name": "Lobsters ML",
+      "url": "https://lobste.rs/t/ml.rss",
+      "tier": 2
+    },
+    {
+      "name": "Ars Technica Gadgets",
+      "url": "https://feeds.arstechnica.com/arstechnica/gadgets",
+      "tier": 1
+    },
+    {
+      "name": "The Information",
+      "url": "https://www.theinformation.com/feed",
+      "tier": 1
+    },
+    {
+      "name": "Protocol/Semafor Tech",
+      "url": "https://www.semafor.com/feed/tech",
+      "tier": 2
+    },
+    {
+      "name": "Platformer",
+      "url": "https://www.platformer.news/rss/",
+      "tier": 2
+    },
+    {
+      "name": "Benedict Evans",
+      "url": "https://www.ben-evans.com/benedictevans?format=rss",
+      "tier": 1
+    },
+    {
+      "name": "Stratechery",
+      "url": "https://stratechery.com/feed/",
+      "tier": 1
+    },
+    {
+      "name": "404 Media",
+      "url": "https://www.404media.co/rss/",
+      "tier": 1
+    },
+    {
+      "name": "The Algorithmic Bridge",
+      "url": "https://thealgorithmicbridge.substack.com/feed",
+      "tier": 2
+    },
+    {
+      "name": "Zvi Mowshowitz",
+      "url": "https://thezvi.substack.com/feed",
+      "tier": 2
+    },
+    {
+      "name": "Transformer Circuits",
+      "url": "https://transformer-circuits.pub/rss.xml",
+      "tier": 1
+    },
+    {
+      "name": "Google News AI EU",
+      "url": "https://news.google.com/rss/search?q=EU+AI+Act+OR+European+AI+regulation+OR+AI+Europe&hl=en&gl=US&ceid=US:en",
+      "tier": 2
     }
   ],
   "keywords": {
@@ -929,7 +1054,32 @@
     "vpn",
     "nordvpn",
     "password manager",
-    "cardpointers"
+    "cardpointers",
+    "motley fool",
+    "stock pick",
+    "buy and hold",
+    "portfolio",
+    "dividend",
+    "wall street",
+    "stock market",
+    "investment",
+    "retirees",
+    "$5,000",
+    "$10,000",
+    "millionaire",
+    "hype cycle",
+    "biggest risk",
+    "next palantir",
+    "clinical decision",
+    "obstetrics",
+    "gynecology",
+    "nursing",
+    "rheumatoid",
+    "curriculum",
+    "pre-matriculation",
+    "blue-collar work",
+    "workforce demand",
+    "bachelor of science"
   ],
   "product_signals": [
     "review",
