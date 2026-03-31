@@ -232,6 +232,9 @@ def compute_score(title, summary, source, brand, image_url, cfg):
     # Cap Reddit base score — they shouldn't outrank actual journalism
     if source.startswith('r/'):
         s = min(s, 65)  # Hard cap before position bonus
+        # Long titles = not a headline, it's a discussion post
+        if len(title) > 150:
+            s -= 15
         # Noise penalty for personal/discussion/question posts
         _REDDIT_NOISE = ['i just', 'i tried', 'i tested', 'i built', 'i made',
                          'i want', 'i need', 'my ', 'anyone', 'how do',
@@ -456,6 +459,21 @@ def esc(s):
 
 def strip_dashes(s):
     return s.replace("\u2014", " ").replace("\u2013", " ") if s else s
+
+def clean_reddit_title(title, source):
+    """Truncate Reddit titles to first sentence if too long."""
+    if not source.startswith("r/") or len(title) <= 120:
+        return title
+    # Cut at first sentence boundary
+    for sep in ['. ', '! ', '? ', ' — ', ' - ', ': ']:
+        idx = title.find(sep)
+        if 20 < idx < 140:
+            return title[:idx + 1].rstrip()
+    # Fallback: cut at 120 chars on word boundary
+    if len(title) > 120:
+        cut = title[:120].rsplit(' ', 1)[0]
+        return cut + "…"
+    return title
 
 def format_date(iso):
     try:
@@ -685,7 +703,7 @@ def render_placeholder(category, variant="card"):
             f'style="background:linear-gradient(135deg,{c1},{c2})">{icon}</div>')
 
 def render_hero(article, params):
-    title = esc(strip_dashes(article["title"]))
+    title = esc(strip_dashes(clean_reddit_title(article["title"], article.get("source", ""))))
     badge_label, badge_color = score_badge(article["score"])
     cat_info = CATEGORY_MAP.get(article["category"], CATEGORY_MAP["gadgets"])
     emoji, c1, c2 = get_article_emoji(article)
@@ -708,7 +726,7 @@ def render_hero(article, params):
 </div>'''
 
 def render_card(article):
-    title = esc(strip_dashes(article["title"]))
+    title = esc(strip_dashes(clean_reddit_title(article["title"], article.get("source", ""))))
     summary = esc(strip_dashes(article["summary"] or ""))
     price = extract_price(article["title"], article["summary"])
     badge_label, badge_color = score_badge(article["score"])
