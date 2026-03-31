@@ -1,0 +1,604 @@
+"""P22 GADGETFINDER -- Gadget-Discovery-Tool. Was ist HOT? Was ist NEU?"""
+import json, os, time, re, hashlib, sqlite3
+from pathlib import Path
+from datetime import datetime, timezone, timedelta
+from html import escape
+from fastapi import FastAPI, Query, Request
+from fastapi.responses import HTMLResponse, Response
+import uvicorn
+
+BASE = Path(__file__).parent
+DB_PATH = BASE / "data" / "gadgets.db"
+FEEDS_PATH = BASE / "data" / "feeds.json"
+
+app = FastAPI()
+
+# ---------------------------------------------------------------------------
+# DB
+# ---------------------------------------------------------------------------
+
+def get_db():
+    db = sqlite3.connect(str(DB_PATH))
+    db.row_factory = sqlite3.Row
+    db.execute("PRAGMA journal_mode=WAL")
+    return db
+
+def init_db():
+    db = get_db()
+    db.executescript("""
+        CREATE TABLE IF NOT EXISTS articles (
+            id TEXT PRIMARY KEY,
+            title TEXT NOT NULL,
+            url TEXT NOT NULL,
+            source TEXT NOT NULL,
+            category TEXT DEFAULT 'gadgets',
+            brand TEXT,
+            summary TEXT,
+            image_url TEXT,
+            published TEXT,
+            fetched TEXT,
+            score INTEGER DEFAULT 0
+        );
+        CREATE INDEX IF NOT EXISTS idx_published ON articles(published DESC);
+        CREATE INDEX IF NOT EXISTS idx_category ON articles(category);
+    """)
+    db.close()
+
+init_db()
+
+# ---------------------------------------------------------------------------
+# Config
+# ---------------------------------------------------------------------------
+
+def load_config():
+    with open(FEEDS_PATH) as f:
+        return json.load(f)
+
+CAT_ICONS = {
+    "audio": "🎧", "wearables": "⌚", "mobile": "📱", "smarthome": "🏠",
+    "gaming": "🎮", "power": "🔋", "desk": "🖥️", "gadgets": "📦",
+}
+CAT_LABELS = {
+    "audio": "Audio", "wearables": "Wearables", "mobile": "Mobile",
+    "smarthome": "Smart Home", "gaming": "Gaming", "power": "Power & Laden",
+    "desk": "Desk Setup", "gadgets": "Gadgets",
+}
+CAT_GRADIENTS = {
+    "audio": "linear-gradient(135deg,#1a1a3e,#2d1b4e)",
+    "wearables": "linear-gradient(135deg,#1a2a1a,#1b3a2e)",
+    "mobile": "linear-gradient(135deg,#2a1a1a,#3a1b2e)",
+    "smarthome": "linear-gradient(135deg,#1a2a2a,#1b3a3e)",
+    "gaming": "linear-gradient(135deg,#2a1a2a,#3a1b3e)",
+    "power": "linear-gradient(135deg,#2a2a1a,#3a3a1b)",
+    "desk": "linear-gradient(135deg,#1a1a2a,#2b2b3e)",
+    "gadgets": "linear-gradient(135deg,#1a1a1a,#2a2a2a)",
+}
+
+# ---------------------------------------------------------------------------
+# Score -- neu berechnet bei jedem Render
+# ---------------------------------------------------------------------------
+
+SCORE_BOOSTER_WORDS = ["review", "test", "hands-on", "unboxing", "vs", "comparison",
+                       "best", "top", "versus", "rated", "ranking", "benchmark"]
+
+def compute_score(row, config):
+    """Berechne Score dynamisch aus Artikeldaten."""
+    score = 0
+    title_lower = (row["title"] or "").lower()
+    summary_lower = (row["summary"] or "").lower()
+    text = title_lower + " " + summary_lower
+
+    # Brand match
+    for b in config.get("brands_watchlist", []):
+        if b.lower() in text:
+            score += 20
+            break
+
+    # Kategorie-Keywords
+    kw_hits = 0
+    for cat, kws in config.get("keywords", {}).items():
+        for kw in kws:
+            if kw in text:
+                kw_hits += 1
+    score += min(kw_hits, 5) * 10
+
+    # Tier
+    source = (row["source"] or "").lower()
+    tier_map = {}
+    for f in config.get("feeds", []):
+        tier_map[f["name"].lower()] = f.get("tier", 3)
+    tier = tier_map.get(source, 3)
+    if tier == 1:
+        score += 15
+    elif tier == 2:
+        score += 10
+    else:
+        score += 5
+
+    # Hat Bild
+    if row["image_url"]:
+        score += 10
+
+    # Review/Test Booster
+    for word in SCORE_BOOSTER_WORDS:
+        if word in title_lower:
+            score += 15
+            break
+
+    # best/top/vs/comparison in title
+    for word in ["best", "top", "vs", "comparison", "versus"]:
+        if word in title_lower:
+            score += 10
+            break
+
+    return score
+
+# ---------------------------------------------------------------------------
+# Kategorie -- verbessert, Multi-Match, catch-all nur wenn nix passt
+# ---------------------------------------------------------------------------
+
+def assign_category(title, summary, config):
+    """Bessere Kategorie-Zuordnung. 'gadgets' nur als Fallback."""
+    text = (title + " " + summary).lower()
+    scores = {}
+    for cat, kws in config.get("keywords", {}).items():
+        if cat == "gadgets":
+            continue
+        cat_score = 0
+        for kw in kws:
+            if kw in text:
+                cat_score += 1
+        if cat_score > 0:
+            scores[cat] = cat_score
+    if not scores:
+        return "gadgets"
+    return max(scores, key=scores.get)
+
+# ---------------------------------------------------------------------------
+# Fetch mit og:image Nachladen
+# ---------------------------------------------------------------------------
+
+def try_fetch_og_image(url):
+    """Versuche og:image von der Artikel-URL zu holen."""
+    try:
+        import requests
+        from bs4 import BeautifulSoup
+        resp = requests.get(url, timeout=5, headers={
+            "User-Agent": "Mozilla/5.0 (compatible; Gadgetfinder/1.0)"
+        })
+        if resp.status_code == 200:
+            soup = BeautifulSoup(resp.text[:50000], "html.parser")
+            og = soup.find("meta", property="og:image")
+            if og and og.get("content"):
+                return og["content"]
+    except Exception:
+        pass
+    return ""
+
+def fetch_feeds():
+    import feedparser
+    config = load_config()
+    keywords = config["keywords"]
+    brands = [b.lower() for b in config["brands_watchlist"]]
+    db = get_db()
+    new_count = 0
+    for feed_cfg in config["feeds"]:
+        try:
+            feed = feedparser.parse(feed_cfg["url"])
+            for entry in feed.entries[:30]:
+                title = entry.get("title", "").strip()
+                url = entry.get("link", "").strip()
+                if not title or not url:
+                    continue
+                art_id = hashlib.md5(url.encode()).hexdigest()[:16]
+                if db.execute("SELECT 1 FROM articles WHERE id=?", (art_id,)).fetchone():
+                    continue
+
+                summary = entry.get("summary", "")[:500] or ""
+                text = (title + " " + summary).lower()
+
+                # Noise-Filter: Deals, How-tos, News-Roundups raus
+                noise_patterns = config.get("noise_patterns", [])
+                is_noise = False
+                for np in noise_patterns:
+                    if np in text:
+                        is_noise = True
+                        break
+                if is_noise:
+                    # Trotzdem rein wenn starkes Produkt-Signal
+                    product_hits = sum(1 for ps in config.get("product_signals", []) if ps in text)
+                    if product_hits < 2:
+                        continue
+
+                # Relevanz-Check: mindestens ein Keyword oder Brand muss matchen
+                matched = False
+                matched_brand = None
+                for b in brands:
+                    if b in text:
+                        matched_brand = b.title()
+                        matched = True
+                        break
+                if not matched:
+                    for cat, cat_kws in keywords.items():
+                        for kw in cat_kws:
+                            if kw in text:
+                                matched = True
+                                break
+                        if matched:
+                            break
+                if not matched:
+                    continue
+
+                # Kategorie
+                matched_cat = assign_category(title, summary, config)
+
+                # Published
+                pub = ""
+                if hasattr(entry, "published_parsed") and entry.published_parsed:
+                    try:
+                        pub = datetime(*entry.published_parsed[:6]).isoformat()
+                    except Exception:
+                        pass
+                if not pub:
+                    pub = datetime.now(timezone.utc).isoformat()
+
+                # Bild: Feed-Medien, dann og:image
+                img = ""
+                if hasattr(entry, "media_content") and entry.media_content:
+                    img = entry.media_content[0].get("url", "")
+                elif hasattr(entry, "media_thumbnail") and entry.media_thumbnail:
+                    img = entry.media_thumbnail[0].get("url", "")
+                if not img:
+                    img = try_fetch_og_image(url)
+
+                db.execute(
+                    """INSERT OR IGNORE INTO articles
+                    (id,title,url,source,category,brand,summary,image_url,published,fetched,score)
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
+                    (art_id, title, url, feed_cfg["name"], matched_cat, matched_brand,
+                     summary[:300], img, pub, datetime.now(timezone.utc).isoformat(), 0))
+                new_count += 1
+        except Exception as e:
+            print(f"Feed error {feed_cfg['name']}: {e}")
+    db.commit()
+    db.close()
+    return new_count
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def date_label(date_str):
+    try:
+        d = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
+        now = datetime.now(timezone.utc)
+        if d.date() == now.date():
+            return "Heute"
+        if d.date() == (now - timedelta(days=1)).date():
+            return "Gestern"
+        return d.strftime("%d. %B %Y")
+    except Exception:
+        return ""
+
+def is_new(date_str):
+    try:
+        d = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
+        return (datetime.now(timezone.utc) - d) < timedelta(hours=24)
+    except Exception:
+        return False
+
+def score_badge(s):
+    if s >= 80:
+        return f'<span class="score hot">🔥 {s}</span>'
+    if s >= 60:
+        return f'<span class="score good">⭐ {s}</span>'
+    if s >= 40:
+        return f'<span class="score mid">● {s}</span>'
+    return f'<span class="score low">● {s}</span>'
+
+def truncate(text, length=120):
+    text = re.sub(r"<[^>]+>", "", text or "")
+    text = text.strip()
+    if len(text) > length:
+        return text[:length].rsplit(" ", 1)[0] + "..."
+    return text
+
+def img_html_feed(row):
+    """Bild fuer Feed-Karten (120x80)."""
+    url = row["image_url"]
+    cat = row["category"] or "gadgets"
+    if url:
+        return f'<div class="card-img"><img src="{escape(url)}" alt="" loading="lazy"></div>'
+    gradient = CAT_GRADIENTS.get(cat, CAT_GRADIENTS["gadgets"])
+    icon = CAT_ICONS.get(cat, "📦")
+    return f'<div class="card-img placeholder" style="background:{gradient}"><span>{icon}</span></div>'
+
+def img_html_hero(row):
+    """Bild fuer Hero (volle Breite)."""
+    url = row["image_url"]
+    cat = row["category"] or "gadgets"
+    if url:
+        return f'<div class="hero-img"><img src="{escape(url)}" alt="" loading="lazy"></div>'
+    gradient = CAT_GRADIENTS.get(cat, CAT_GRADIENTS["gadgets"])
+    icon = CAT_ICONS.get(cat, "📦")
+    return f'<div class="hero-img placeholder" style="background:{gradient}"><span class="hero-icon">{icon}</span></div>'
+
+# ---------------------------------------------------------------------------
+# CSS
+# ---------------------------------------------------------------------------
+
+CSS = """
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:system-ui,-apple-system,sans-serif;background:#08080c;color:#e0dcd4;min-height:100vh;-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+.w{max-width:640px;margin:0 auto;padding:.8rem .8rem 4rem}
+
+/* Header */
+.hd{display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;padding-bottom:.6rem;border-bottom:1px solid #1a1a24}
+.hd h1{font-size:1.15rem;font-weight:700;letter-spacing:-.01em}
+.hd h1 .cnt{opacity:.35;font-weight:400;font-size:.7rem;margin-left:.3rem}
+.rf{font-size:.65rem;color:#666;border:1px solid #1a1a24;padding:.35rem .7rem;border-radius:6px;transition:all .2s}
+.rf:hover{color:#c9a84c;border-color:#c9a84c}
+
+/* Sticky Filter Bar */
+.filters{position:sticky;top:0;z-index:10;background:#08080c;padding:.5rem 0;margin-bottom:.8rem}
+.bar{display:flex;gap:.35rem;overflow-x:auto;scrollbar-width:none;padding-bottom:.25rem}
+.bar::-webkit-scrollbar{display:none}
+.chip{white-space:nowrap;padding:.35rem .7rem;border-radius:16px;border:1px solid #1a1a24;color:#666;font-size:.7rem;flex-shrink:0;transition:all .2s;cursor:pointer}
+.chip:hover,.chip.on{color:#c9a84c;border-color:#c9a84c;background:rgba(201,168,76,.08)}
+.chip.brand-chip{font-size:.65rem}
+.chip.brand-chip.on{color:#4a9eff;border-color:#4a9eff;background:rgba(74,158,255,.08)}
+
+/* Hero */
+.hero{background:#0e0e14;border-radius:12px;overflow:hidden;margin-bottom:1.2rem;border:1px solid #1a1a24;transition:border-color .2s}
+.hero:hover{border-color:#c9a84c}
+.hero-img{width:100%;aspect-ratio:16/9;overflow:hidden;position:relative}
+.hero-img img{width:100%;height:100%;object-fit:cover}
+.hero-img.placeholder{display:flex;align-items:center;justify-content:center}
+.hero-icon{font-size:3rem}
+.hero-body{padding:1rem}
+.hero-top{display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem}
+.hero-label{font-size:.6rem;text-transform:uppercase;letter-spacing:.1em;color:#c9a84c;font-weight:600}
+.hero h2{font-size:1.05rem;line-height:1.4;font-weight:600;margin-bottom:.4rem}
+.hero .summary{font-size:.78rem;color:#999;line-height:1.5;margin-bottom:.6rem}
+.hero .meta{display:flex;gap:.4rem;flex-wrap:wrap;align-items:center}
+
+/* Trending */
+.section-title{font-size:.7rem;text-transform:uppercase;letter-spacing:.1em;color:#c9a84c;font-weight:600;margin:1.2rem 0 .6rem;display:flex;align-items:center;gap:.4rem}
+.trending-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:.6rem;margin-bottom:1.2rem}
+.trend-card{background:#0e0e14;border-radius:10px;overflow:hidden;border:1px solid #1a1a24;transition:all .2s}
+.trend-card:hover{border-color:#c9a84c;transform:translateY(-1px)}
+.trend-card .card-img{width:100%;aspect-ratio:4/3;overflow:hidden;position:relative}
+.trend-card .card-img img{width:100%;height:100%;object-fit:cover}
+.trend-card .card-img.placeholder{display:flex;align-items:center;justify-content:center}
+.trend-card .card-img.placeholder span{font-size:1.5rem}
+.trend-body{padding:.55rem}
+.trend-body .title{font-size:.75rem;line-height:1.35;font-weight:500;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.trend-body .tmeta{display:flex;gap:.3rem;margin-top:.35rem;flex-wrap:wrap;align-items:center}
+
+/* Feed Cards */
+.feed-card{display:flex;gap:.7rem;padding:.65rem 0;border-bottom:1px solid #111;transition:background .15s;border-radius:6px;padding-left:.3rem;padding-right:.3rem}
+.feed-card:hover{background:rgba(201,168,76,.03)}
+.feed-card .card-img{width:100px;min-width:100px;height:70px;border-radius:8px;overflow:hidden;flex-shrink:0}
+.feed-card .card-img img{width:100%;height:100%;object-fit:cover}
+.feed-card .card-img.placeholder{display:flex;align-items:center;justify-content:center;border-radius:8px}
+.feed-card .card-img.placeholder span{font-size:1.2rem}
+.feed-card .card-body{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center}
+.feed-card .title{font-size:.8rem;line-height:1.35;font-weight:500;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;transition:color .15s}
+.feed-card:hover .title{color:#c9a84c}
+.feed-card .snippet{font-size:.68rem;color:#777;line-height:1.4;margin-top:.2rem;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}
+.feed-card .fmeta{display:flex;gap:.3rem;margin-top:.3rem;flex-wrap:wrap;align-items:center}
+
+/* Pills & Badges */
+.pill{font-size:.58rem;padding:.15rem .45rem;border-radius:8px;display:inline-flex;align-items:center}
+.pill.brand{background:rgba(74,158,255,.1);color:#5aa8ff}
+.pill.src{background:#111;color:#555}
+.pill.cat{background:rgba(201,168,76,.1);color:#c9a84c}
+.score{font-size:.6rem;padding:.15rem .5rem;border-radius:10px;font-weight:600;display:inline-flex;align-items:center;gap:.2rem}
+.score.hot{background:rgba(255,90,50,.15);color:#ff6a3d}
+.score.good{background:rgba(201,168,76,.15);color:#c9a84c}
+.score.mid{background:rgba(100,100,100,.15);color:#888}
+.score.low{background:rgba(60,60,60,.1);color:#555}
+.new-badge{font-size:.55rem;padding:.1rem .4rem;border-radius:6px;background:rgba(80,200,120,.15);color:#50c878;font-weight:600;text-transform:uppercase;letter-spacing:.05em}
+
+/* Date separator */
+.date-sep{font-size:.65rem;color:#c9a84c;font-weight:600;letter-spacing:.08em;text-transform:uppercase;padding:1rem 0 .3rem}
+
+/* Empty state */
+.empty{text-align:center;color:#555;padding:3rem;font-size:.85rem}
+.empty a{color:#c9a84c}
+
+/* Responsive tweaks */
+@media(max-width:400px){
+    .trending-grid{grid-template-columns:1fr}
+    .feed-card .card-img{width:80px;min-width:80px;height:56px}
+}
+"""
+
+# ---------------------------------------------------------------------------
+# Routes
+# ---------------------------------------------------------------------------
+
+@app.get("/", response_class=HTMLResponse)
+async def index(request: Request, cat: str = Query("all"), brand: str = Query("")):
+    db = get_db()
+    config = load_config()
+
+    # Alle Artikel laden (noise wird beim Fetch schon gefiltert, score >= 0)
+    rows = db.execute("SELECT * FROM articles WHERE score >= 0 ORDER BY published DESC LIMIT 200").fetchall()
+    total = db.execute("SELECT COUNT(*) FROM articles WHERE score >= 0").fetchone()[0]
+    db.close()
+
+    # Score dynamisch berechnen
+    articles = []
+    for r in rows:
+        a = dict(r)
+        a["_score"] = compute_score(a, config)
+        articles.append(a)
+
+    # Filter anwenden
+    if brand:
+        articles = [a for a in articles if a["brand"] and brand.lower() in a["brand"].lower()]
+    elif cat != "all":
+        articles = [a for a in articles if a["category"] == cat]
+
+    # Sortierungen
+    by_score = sorted(articles, key=lambda a: a["_score"], reverse=True)
+    by_date = sorted(articles, key=lambda a: a.get("published", ""), reverse=True)
+
+    categories = [c for c in config["keywords"].keys()]
+    brands_list = config["brands_watchlist"][:14]
+
+    # --- Hero: Top Gadget (hoechster Score) ---
+    hero_html = ""
+    if by_score and not brand:
+        h = by_score[0]
+        new_b = '<span class="new-badge">Neu</span>' if is_new(h.get("published", "")) else ""
+        brand_p = f'<span class="pill brand">{escape(h["brand"])}</span>' if h["brand"] else ""
+        src_p = f'<span class="pill src">{escape(h["source"])}</span>'
+        summary_t = truncate(h.get("summary", ""), 180)
+        hero_html = f'''<a href="{escape(h["url"])}" target="_blank" rel="noopener" class="hero">
+{img_html_hero(h)}
+<div class="hero-body">
+<div class="hero-top"><span class="hero-label">Top Gadget</span>{new_b}{score_badge(h["_score"])}</div>
+<h2>{escape(h["title"])}</h2>
+<p class="summary">{escape(summary_t)}</p>
+<div class="meta">{brand_p}{src_p}<span class="pill cat">{CAT_ICONS.get(h["category"],"📦")} {CAT_LABELS.get(h["category"],"Gadgets")}</span></div>
+</div></a>'''
+
+    # --- Trending: Top 4 nach Score (skip Hero) ---
+    trending_html = ""
+    trending_items = by_score[1:5] if len(by_score) > 1 and not brand else []
+    if trending_items:
+        cards = ""
+        for t in trending_items:
+            new_b = '<span class="new-badge">Neu</span>' if is_new(t.get("published", "")) else ""
+            brand_p = f'<span class="pill brand">{escape(t["brand"])}</span>' if t["brand"] else ""
+            cards += f'''<a href="{escape(t["url"])}" target="_blank" rel="noopener" class="trend-card">
+<div class="card-img">{"" if not t["image_url"] else f'<img src="{escape(t["image_url"])}" alt="" loading="lazy">'}</div>
+{f'<div class="card-img placeholder" style="background:{CAT_GRADIENTS.get(t["category"], CAT_GRADIENTS["gadgets"])}"><span>{CAT_ICONS.get(t["category"], "📦")}</span></div>' if not t["image_url"] else ""}
+<div class="trend-body">
+<div class="title">{escape(t["title"])}</div>
+<div class="tmeta">{score_badge(t["_score"])}{new_b}{brand_p}<span class="pill src">{escape(t["source"])}</span></div>
+</div></a>'''
+        trending_html = f'<div class="section-title">🔥 Trending</div><div class="trending-grid">{cards}</div>'
+
+    # --- Feed: chronologisch ---
+    feed_html = ""
+    # Skip Hero + Trending Artikel im Feed
+    hero_trending_ids = set()
+    if by_score and not brand:
+        for a in by_score[:5]:
+            hero_trending_ids.add(a["id"])
+
+    feed_articles = [a for a in by_date if a["id"] not in hero_trending_ids]
+
+    prev_date = ""
+    for a in feed_articles[:60]:
+        label = date_label(a.get("published", ""))
+        if label and label != prev_date:
+            feed_html += f'<div class="date-sep">{label}</div>'
+            prev_date = label
+
+        new_b = ' <span class="new-badge">Neu</span>' if is_new(a.get("published", "")) else ""
+        brand_p = f'<span class="pill brand">{escape(a["brand"])}</span>' if a["brand"] else ""
+        src_p = f'<span class="pill src">{escape(a["source"])}</span>'
+        cat_p = f'<span class="pill cat">{CAT_ICONS.get(a["category"], "📦")}</span>'
+        snippet = truncate(a.get("summary", ""), 80)
+
+        feed_html += f'''<a href="{escape(a["url"])}" target="_blank" rel="noopener" class="feed-card" data-cat="{a["category"]}" data-brand="{escape(a.get("brand","") or "")}">
+{img_html_feed(a)}
+<div class="card-body">
+<div class="title">{escape(a["title"])}</div>
+<div class="snippet">{escape(snippet)}</div>
+<div class="fmeta">{score_badge(a["_score"])}{new_b}{cat_p}{brand_p}{src_p}</div>
+</div></a>'''
+
+    if not feed_html and not hero_html:
+        feed_html = '<div class="empty">Keine Artikel gefunden. <a href="/refresh">Feeds laden</a></div>'
+
+    # --- Filter Chips ---
+    cat_on = "  on" if cat == "all" and not brand else ""
+    cat_chips = f'<a class="chip{cat_on}" href="#" data-filter="cat" data-val="all">Alle</a>'
+    for c in categories:
+        active = " on" if c == cat and not brand else ""
+        label = CAT_LABELS.get(c, c.title())
+        icon = CAT_ICONS.get(c, "")
+        cat_chips += f'<a class="chip{active}" href="#" data-filter="cat" data-val="{c}">{icon} {label}</a>'
+
+    brand_chips = ""
+    for b in brands_list:
+        active = " on" if brand and b.lower() == brand.lower() else ""
+        brand_chips += f'<a class="chip brand-chip{active}" href="#" data-filter="brand" data-val="{escape(b)}">{escape(b)}</a>'
+
+    feed_section = f'<div class="section-title">📰 Alle Artikel</div>{feed_html}' if feed_articles else feed_html
+
+    return HTMLResponse(f"""<!DOCTYPE html><html lang="de"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Gadgetfinder</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎧</text></svg>">
+<style>{CSS}</style></head><body>
+<div class="w">
+<div class="hd"><h1>🎧 Gadgetfinder<span class="cnt">{total} Artikel</span></h1><a href="/refresh" class="rf">↻ Aktualisieren</a></div>
+<div class="filters">
+<div class="bar">{cat_chips}</div>
+<div class="bar">{brand_chips}</div>
+</div>
+{hero_html}
+{trending_html}
+{feed_section}
+</div>
+<script>
+document.addEventListener('click',function(e){{
+  var t=e.target.closest('[data-filter]');
+  if(!t)return;
+  e.preventDefault();
+  var type=t.dataset.filter,val=t.dataset.val;
+  if(type==='cat'){{
+    document.querySelectorAll('.chip:not(.brand-chip)').forEach(function(c){{c.classList.remove('on')}});
+    t.classList.add('on');
+    document.querySelectorAll('.brand-chip').forEach(function(c){{c.classList.remove('on')}});
+    document.querySelectorAll('.feed-card').forEach(function(card){{
+      card.style.display=(val==='all'||card.dataset.cat===val)?'':'none';
+    }});
+  }}else{{
+    document.querySelectorAll('.brand-chip').forEach(function(c){{c.classList.remove('on')}});
+    t.classList.add('on');
+    document.querySelectorAll('.chip:not(.brand-chip)').forEach(function(c){{c.classList.remove('on')}});
+    document.querySelectorAll('.feed-card').forEach(function(card){{
+      card.style.display=(card.dataset.brand&&card.dataset.brand.toLowerCase().indexOf(val.toLowerCase())>=0)?'':'none';
+    }});
+  }}
+  document.querySelectorAll('.date-sep').forEach(function(sep){{
+    var next=sep.nextElementSibling,vis=false;
+    while(next&&!next.classList.contains('date-sep')){{
+      if(next.classList.contains('feed-card')&&next.style.display!=='none')vis=true;
+      next=next.nextElementSibling;
+    }}
+    sep.style.display=vis?'':'none';
+  }});
+}});
+</script>
+</body></html>""")
+
+
+@app.get("/refresh")
+async def refresh():
+    n = fetch_feeds()
+    return Response(status_code=303, headers={"Location": f"/?refreshed={n}"})
+
+
+@app.get("/api/health")
+async def health():
+    db = get_db()
+    total = db.execute("SELECT COUNT(*) FROM articles").fetchone()[0]
+    db.close()
+    return {"status": "ok", "articles": total}
+
+
+if __name__ == "__main__":
+    print("Feeds laden...")
+    n = fetch_feeds()
+    print(f"{n} neue Artikel geladen")
+    uvicorn.run("server:app", host="127.0.0.1", port=3023, reload=False)

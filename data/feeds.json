@@ -1,0 +1,953 @@
+{
+  "feeds": [
+    {
+      "name": "The Verge Reviews",
+      "url": "https://www.theverge.com/rss/reviews/index.xml",
+      "tier": 1
+    },
+    {
+      "name": "TechRadar Reviews",
+      "url": "https://www.techradar.com/rss/reviews",
+      "tier": 1
+    },
+    {
+      "name": "Gear Patrol Tech",
+      "url": "https://www.gearpatrol.com/feed/",
+      "tier": 1
+    },
+    {
+      "name": "Wirecutter",
+      "url": "https://www.nytimes.com/wirecutter/feed/",
+      "tier": 1
+    },
+    {
+      "name": "Notebookcheck Reviews",
+      "url": "https://www.notebookcheck.net/RSS-Feed-Notebook-Reviews.8156.0.html",
+      "tier": 1
+    },
+    {
+      "name": "Wareable",
+      "url": "https://www.wareable.com/feed",
+      "tier": 2
+    },
+    {
+      "name": "Crinacle",
+      "url": "https://crinacle.com/feed/",
+      "tier": 2
+    },
+    {
+      "name": "HiFiGo",
+      "url": "https://hifigo.com/blogs/news.atom",
+      "tier": 2
+    },
+    {
+      "name": "Gadget Flow",
+      "url": "http://feeds.feedburner.com/thegadgetflow",
+      "tier": 2
+    },
+    {
+      "name": "SoundGuys",
+      "url": "https://www.soundguys.com/feed/",
+      "tier": 2
+    },
+    {
+      "name": "GSMArena",
+      "url": "https://www.gsmarena.com/rss-news-reviews.php3",
+      "tier": 2
+    },
+    {
+      "name": "Engadget",
+      "url": "https://www.engadget.com/rss.xml",
+      "tier": 3
+    },
+    {
+      "name": "China-Gadgets",
+      "url": "https://www.china-gadgets.de/feed/",
+      "tier": 3
+    },
+    {
+      "name": "9to5Mac",
+      "url": "https://9to5mac.com/feed/",
+      "tier": 3
+    },
+    {
+      "name": "9to5Google",
+      "url": "https://9to5google.com/feed/",
+      "tier": 3
+    },
+    {
+      "name": "Road to VR",
+      "url": "https://www.roadtovr.com/feed/",
+      "tier": 2
+    },
+    {
+      "name": "UploadVR",
+      "url": "https://www.uploadvr.com/feed/",
+      "tier": 2
+    },
+    {
+      "name": "OpenAI Blog",
+      "url": "https://openai.com/blog/rss.xml",
+      "tier": 1
+    },
+    {
+      "name": "Google AI Blog",
+      "url": "https://blog.google/technology/ai/rss/",
+      "tier": 1
+    },
+    {
+      "name": "Microsoft AI Blog",
+      "url": "https://blogs.microsoft.com/ai/feed/",
+      "tier": 1
+    },
+    {
+      "name": "Hugging Face Blog",
+      "url": "https://huggingface.co/blog/feed.xml",
+      "tier": 2
+    },
+    {
+      "name": "DeepMind Blog",
+      "url": "https://deepmind.google/blog/rss.xml",
+      "tier": 1
+    },
+    {
+      "name": "The Verge AI",
+      "url": "https://www.theverge.com/rss/ai-artificial-intelligence/index.xml",
+      "tier": 1
+    },
+    {
+      "name": "TechCrunch AI",
+      "url": "https://techcrunch.com/category/artificial-intelligence/feed/",
+      "tier": 1
+    },
+    {
+      "name": "Ars Technica AI",
+      "url": "https://arstechnica.com/ai/feed/",
+      "tier": 1
+    },
+    {
+      "name": "VentureBeat AI",
+      "url": "https://venturebeat.com/category/ai/feed/",
+      "tier": 2
+    },
+    {
+      "name": "MIT Tech Review AI",
+      "url": "https://www.technologyreview.com/feed/",
+      "tier": 1
+    },
+    {
+      "name": "The Decoder",
+      "url": "https://the-decoder.com/feed/",
+      "tier": 2
+    },
+    {
+      "name": "WIRED",
+      "url": "https://www.wired.com/feed/rss",
+      "tier": 1
+    },
+    {
+      "name": "Android Authority",
+      "url": "https://www.androidauthority.com/feed/",
+      "tier": 2
+    },
+    {
+      "name": "Liliputing",
+      "url": "https://liliputing.com/feed/",
+      "tier": 2
+    },
+    {
+      "name": "AI News EU",
+      "url": "https://www.artificialintelligence-news.com/feed/",
+      "tier": 2
+    },
+    {
+      "name": "Handelsblatt Tech",
+      "url": "https://www.handelsblatt.com/contentexport/feed/technologie",
+      "tier": 2
+    },
+    {
+      "name": "heise KI",
+      "url": "https://www.heise.de/rss/heise-atom.xml",
+      "tier": 2
+    },
+    {
+      "name": "t3n",
+      "url": "https://t3n.de/rss.xml",
+      "tier": 2
+    },
+    {
+      "name": "Golem.de",
+      "url": "https://rss.golem.de/rss.php?feed=RSS2.0",
+      "tier": 2
+    },
+    {
+      "name": "Simon Willison",
+      "url": "https://simonwillison.net/atom/everything/",
+      "tier": 1
+    },
+    {
+      "name": "Towards AI",
+      "url": "https://pub.towardsai.net/feed",
+      "tier": 2
+    },
+    {
+      "name": "Last Week in AI",
+      "url": "https://lastweekin.ai/feed",
+      "tier": 2
+    },
+    {
+      "name": "Tom's Guide",
+      "url": "https://www.tomsguide.com/feeds.xml",
+      "tier": 1
+    },
+    {
+      "name": "The Verge All",
+      "url": "https://www.theverge.com/rss/index.xml",
+      "tier": 2
+    },
+    {
+      "name": "Smarthome Assistent",
+      "url": "https://www.smarthomeassistent.de/feed/",
+      "tier": 3
+    },
+    {
+      "name": "Google Research Blog",
+      "url": "https://blog.research.google/feeds/posts/default?alt=rss",
+      "tier": 1
+    },
+    {
+      "name": "Meta Research",
+      "url": "https://research.facebook.com/feed/",
+      "tier": 1
+    },
+    {
+      "name": "Quantum Computing Report",
+      "url": "https://quantumcomputingreport.com/feed/",
+      "tier": 2
+    },
+    {
+      "name": "The Quantum Insider",
+      "url": "https://thequantuminsider.com/feed/",
+      "tier": 2
+    },
+    {
+      "name": "AnandTech/Tom's Hardware",
+      "url": "https://www.tomshardware.com/feeds/all",
+      "tier": 2
+    },
+    {
+      "name": "SemiAnalysis",
+      "url": "https://www.semianalysis.com/feed",
+      "tier": 1
+    },
+    {
+      "name": "IEEE Spectrum AI",
+      "url": "https://spectrum.ieee.org/feeds/topic/artificial-intelligence.rss",
+      "tier": 1
+    },
+    {
+      "name": "IEEE Spectrum Computing",
+      "url": "https://spectrum.ieee.org/feeds/topic/computing.rss",
+      "tier": 1
+    },
+    {
+      "name": "Science Daily AI",
+      "url": "https://www.sciencedaily.com/rss/computers_math/artificial_intelligence.xml",
+      "tier": 2
+    },
+    {
+      "name": "MIT News AI",
+      "url": "https://news.mit.edu/rss/topic/artificial-intelligence2",
+      "tier": 1
+    },
+    {
+      "name": "r/MachineLearning",
+      "url": "https://www.reddit.com/r/MachineLearning/hot/.rss",
+      "tier": 1
+    },
+    {
+      "name": "r/LocalLLaMA",
+      "url": "https://www.reddit.com/r/LocalLLaMA/hot/.rss",
+      "tier": 1
+    },
+    {
+      "name": "r/artificial",
+      "url": "https://www.reddit.com/r/artificial/hot/.rss",
+      "tier": 2
+    },
+    {
+      "name": "r/ClaudeAI",
+      "url": "https://www.reddit.com/r/ClaudeAI/hot/.rss",
+      "tier": 2
+    },
+    {
+      "name": "r/ChatGPT",
+      "url": "https://www.reddit.com/r/ChatGPT/hot/.rss",
+      "tier": 2
+    },
+    {
+      "name": "r/OpenAI",
+      "url": "https://www.reddit.com/r/OpenAI/hot/.rss",
+      "tier": 2
+    },
+    {
+      "name": "r/singularity",
+      "url": "https://www.reddit.com/r/singularity/hot/.rss",
+      "tier": 2
+    },
+    {
+      "name": "r/StableDiffusion",
+      "url": "https://www.reddit.com/r/StableDiffusion/hot/.rss",
+      "tier": 3
+    },
+    {
+      "name": "r/AutoGPT",
+      "url": "https://www.reddit.com/r/AutoGPT/hot/.rss",
+      "tier": 2
+    },
+    {
+      "name": "r/LangChain",
+      "url": "https://www.reddit.com/r/LangChain/hot/.rss",
+      "tier": 3
+    },
+    {
+      "name": "r/QuantumComputing",
+      "url": "https://www.reddit.com/r/QuantumComputing/hot/.rss",
+      "tier": 2
+    },
+    {
+      "name": "r/gadgets",
+      "url": "https://www.reddit.com/r/gadgets/hot/.rss",
+      "tier": 1
+    },
+    {
+      "name": "r/headphones",
+      "url": "https://www.reddit.com/r/headphones/hot/.rss",
+      "tier": 2
+    },
+    {
+      "name": "r/audiophile",
+      "url": "https://www.reddit.com/r/audiophile/hot/.rss",
+      "tier": 2
+    },
+    {
+      "name": "r/Android",
+      "url": "https://www.reddit.com/r/Android/hot/.rss",
+      "tier": 2
+    },
+    {
+      "name": "r/apple",
+      "url": "https://www.reddit.com/r/apple/hot/.rss",
+      "tier": 2
+    },
+    {
+      "name": "r/VirtualReality",
+      "url": "https://www.reddit.com/r/virtualreality/hot/.rss",
+      "tier": 2
+    },
+    {
+      "name": "r/smarthome",
+      "url": "https://www.reddit.com/r/smarthome/hot/.rss",
+      "tier": 2
+    },
+    {
+      "name": "r/homeassistant",
+      "url": "https://www.reddit.com/r/homeassistant/hot/.rss",
+      "tier": 3
+    },
+    {
+      "name": "r/technology",
+      "url": "https://www.reddit.com/r/technology/hot/.rss",
+      "tier": 1
+    },
+    {
+      "name": "r/hardware",
+      "url": "https://www.reddit.com/r/hardware/hot/.rss",
+      "tier": 2
+    },
+    {
+      "name": "r/nvidia",
+      "url": "https://www.reddit.com/r/nvidia/hot/.rss",
+      "tier": 3
+    },
+    {
+      "name": "r/europeanAI",
+      "url": "https://www.reddit.com/r/EuropeanFederalists/hot/.rss",
+      "tier": 3
+    },
+    {
+      "name": "r/opensource",
+      "url": "https://www.reddit.com/r/opensource/hot/.rss",
+      "tier": 2
+    },
+    {
+      "name": "r/selfhosted",
+      "url": "https://www.reddit.com/r/selfhosted/hot/.rss",
+      "tier": 3
+    },
+    {
+      "name": "Lilian Weng (OpenAI)",
+      "url": "https://lilianweng.github.io/index.xml",
+      "tier": 1
+    },
+    {
+      "name": "Jay Alammar",
+      "url": "https://jalammar.github.io/feed.xml",
+      "tier": 1
+    },
+    {
+      "name": "Chip Huyen",
+      "url": "https://huyenchip.com/feed.xml",
+      "tier": 1
+    },
+    {
+      "name": "Ahead of AI (Seb Raschka)",
+      "url": "https://magazine.sebastianraschka.com/feed",
+      "tier": 1
+    },
+    {
+      "name": "The Gradient",
+      "url": "https://thegradient.pub/rss/",
+      "tier": 1
+    },
+    {
+      "name": "Import AI (Jack Clark)",
+      "url": "https://importai.substack.com/feed",
+      "tier": 1
+    },
+    {
+      "name": "Interconnects (Nathan Lambert)",
+      "url": "https://www.interconnects.ai/feed",
+      "tier": 1
+    },
+    {
+      "name": "Latent Space Pod",
+      "url": "https://www.latent.space/feed",
+      "tier": 1
+    },
+    {
+      "name": "AI Snake Oil",
+      "url": "https://www.aisnakeoil.com/feed",
+      "tier": 1
+    },
+    {
+      "name": "One Useful Thing (Ethan Mollick)",
+      "url": "https://www.oneusefulthing.org/feed",
+      "tier": 1
+    },
+    {
+      "name": "Hacker News AI",
+      "url": "https://hnrss.org/newest?q=AI+OR+LLM+OR+GPT+OR+Claude&points=50",
+      "tier": 1
+    },
+    {
+      "name": "Hacker News Quantum",
+      "url": "https://hnrss.org/newest?q=quantum+computing&points=30",
+      "tier": 2
+    },
+    {
+      "name": "Hacker News Show",
+      "url": "https://hnrss.org/show?points=100",
+      "tier": 2
+    },
+    {
+      "name": "Weights & Biases Blog",
+      "url": "https://wandb.ai/site/blog/feed.xml",
+      "tier": 2
+    },
+    {
+      "name": "LMSys (Chatbot Arena)",
+      "url": "https://blog.lmsys.org/feed.xml",
+      "tier": 1
+    },
+    {
+      "name": "Nous Research Blog",
+      "url": "https://nousresearch.com/blog/feed/",
+      "tier": 2
+    },
+    {
+      "name": "Together AI Blog",
+      "url": "https://www.together.ai/blog/feed",
+      "tier": 2
+    },
+    {
+      "name": "Moore's Law Is Dead",
+      "url": "https://mooreslawisd.com/feed/",
+      "tier": 2
+    },
+    {
+      "name": "Fabricated Knowledge",
+      "url": "https://www.fabricatedknowledge.com/feed",
+      "tier": 2
+    },
+    {
+      "name": "rtings.com Reviews",
+      "url": "https://www.rtings.com/rss/reviews.xml",
+      "tier": 1
+    },
+    {
+      "name": "Scarbir (TWS earbuds)",
+      "url": "https://www.scarbir.com/feed",
+      "tier": 2
+    },
+    {
+      "name": "MajorHiFi",
+      "url": "https://majorhifi.com/feed/",
+      "tier": 2
+    },
+    {
+      "name": "South China Morning Post AI",
+      "url": "https://www.scmp.com/rss/5/topic/artificial-intelligence/feed",
+      "tier": 2
+    },
+    {
+      "name": "Pandaily (China Tech)",
+      "url": "https://pandaily.com/feed/",
+      "tier": 2
+    },
+    {
+      "name": "Analytics India Magazine",
+      "url": "https://analyticsindiamag.com/feed/",
+      "tier": 2
+    },
+    {
+      "name": "Arabian Business Tech",
+      "url": "https://www.arabianbusiness.com/technology/feed",
+      "tier": 3
+    },
+    {
+      "name": "Tech in Asia",
+      "url": "https://www.techinasia.com/feed",
+      "tier": 2
+    },
+    {
+      "name": "Rest of World",
+      "url": "https://restofworld.org/feed/",
+      "tier": 1
+    },
+    {
+      "name": "Sifted (EU Tech)",
+      "url": "https://sifted.eu/feed/",
+      "tier": 2
+    },
+    {
+      "name": "Tech.eu",
+      "url": "https://tech.eu/feed/",
+      "tier": 2
+    }
+  ],
+  "keywords": {
+    "audio": [
+      "headphone",
+      "earphone",
+      "earbud",
+      "speaker",
+      "soundbar",
+      "amplifier",
+      "dac",
+      "iem",
+      "over-ear",
+      "on-ear",
+      "in-ear",
+      "wireless audio",
+      "turntable",
+      "vinyl",
+      "hi-fi",
+      "hifi",
+      "subwoofer",
+      "receiver",
+      "microphone",
+      "podcast mic",
+      "studio monitor",
+      "noise cancel"
+    ],
+    "wearables": [
+      "smartwatch",
+      "fitness tracker",
+      "smart ring",
+      "smart glasses",
+      "health tracker",
+      "sleep tracker",
+      "oura",
+      "garmin",
+      "fitbit",
+      "apple watch",
+      "galaxy watch",
+      "pixel watch"
+    ],
+    "mobile": [
+      "smartphone",
+      "iphone",
+      "galaxy s",
+      "pixel ",
+      "oneplus",
+      "nothing phone",
+      "foldable",
+      "phone case",
+      "screen protector",
+      "mobile"
+    ],
+    "smarthome": [
+      "smart home",
+      "smart display",
+      "smart speaker",
+      "thermostat",
+      "robot vacuum",
+      "air purifier",
+      "smart light",
+      "smart lock",
+      "home assistant",
+      "matter ",
+      "homekit",
+      "alexa"
+    ],
+    "gaming": [
+      "gaming headset",
+      "gaming mouse",
+      "gaming keyboard",
+      "controller",
+      "console",
+      "handheld",
+      "steam deck",
+      "switch",
+      "playstation",
+      "xbox",
+      "gaming monitor",
+      "gaming chair"
+    ],
+    "power": [
+      "charger",
+      "power bank",
+      "charging",
+      "usb-c",
+      "wireless charging",
+      "battery pack",
+      "power station",
+      "solar panel"
+    ],
+    "desk": [
+      "keyboard",
+      "mouse",
+      "monitor",
+      "webcam",
+      "desk setup",
+      "standing desk",
+      "laptop stand",
+      "docking station",
+      "usb hub",
+      "external display"
+    ],
+    "gadgets": [
+      "drone",
+      "action camera",
+      "gimbal",
+      "projector",
+      "e-reader",
+      "kindle",
+      "3d printer",
+      "portable",
+      "gadget",
+      "accessory",
+      "tool"
+    ],
+    "ai": [
+      "artificial intelligence",
+      "machine learning",
+      "deep learning",
+      "neural network",
+      "large language model",
+      "llm",
+      "gpt",
+      "claude",
+      "gemini",
+      "llama",
+      "mistral",
+      "foundation model",
+      "open source ai",
+      "open-source model",
+      "open weight",
+      "ai agent",
+      "agentic",
+      "autonomous agent",
+      "multi-agent",
+      "tool use",
+      "function calling",
+      "mcp",
+      "model context protocol",
+      "computer use",
+      "new model",
+      "model release",
+      "api update",
+      "new feature",
+      "context window",
+      "fine-tuning",
+      "rag",
+      "embedding",
+      "reasoning",
+      "chain of thought",
+      "openai",
+      "anthropic",
+      "deepmind",
+      "google ai",
+      "meta ai",
+      "mistral ai",
+      "hugging face",
+      "cohere",
+      "groq",
+      "cerebras",
+      "perplexity",
+      "eu ai act",
+      "ai regulation",
+      "european ai",
+      "aleph alpha",
+      "mistral",
+      "ai safety",
+      "alignment",
+      "responsible ai",
+      "text-to-image",
+      "text-to-video",
+      "text-to-speech",
+      "image generation",
+      "stable diffusion",
+      "midjourney",
+      "dall-e",
+      "sora",
+      "runway",
+      "elevenlabs",
+      "suno",
+      "ai chip",
+      "neural processing",
+      "npu",
+      "tpu",
+      "gpu",
+      "nvidia",
+      "open source",
+      "huggingface",
+      "ollama",
+      "local ai",
+      "self-hosted",
+      "deepseek",
+      "baidu",
+      "alibaba",
+      "tencent",
+      "qwen",
+      "yi-",
+      "falcon",
+      "jais",
+      "noor",
+      "saudi",
+      "neom",
+      "india ai",
+      "indian ai",
+      "reliance jio"
+    ],
+    "quantum": [
+      "quantum computing",
+      "quantum computer",
+      "qubit",
+      "quantum bit",
+      "quantum advantage",
+      "quantum supremacy",
+      "quantum error correction",
+      "quantum algorithm",
+      "quantum simulation",
+      "quantum network",
+      "quantum internet",
+      "quantum cryptography",
+      "quantum key distribution",
+      "ibm quantum",
+      "google quantum",
+      "ionq",
+      "rigetti",
+      "iqm",
+      "d-wave",
+      "photonic quantum",
+      "trapped ion",
+      "superconducting qubit",
+      "quantum machine learning",
+      "variational quantum",
+      "quantum annealing",
+      "quantum processor",
+      "quantum chip",
+      "topological qubit"
+    ],
+    "science": [
+      "research paper",
+      "breakthrough",
+      "scientific",
+      "researchers found",
+      "published in nature",
+      "published in science",
+      "arxiv",
+      "preprint",
+      "peer review",
+      "neural architecture",
+      "transformer architecture",
+      "compute efficiency",
+      "scaling law",
+      "emergent",
+      "benchmark",
+      "state of the art",
+      "sota",
+      "new record",
+      "outperforms",
+      "training run",
+      "inference speed",
+      "parameter count",
+      "supercomputer",
+      "exascale",
+      "hpc",
+      "high performance computing",
+      "semiconductor",
+      "chip design",
+      "photonic",
+      "neuromorphic"
+    ]
+  },
+  "brands_watchlist": [
+    "Bose",
+    "Sony",
+    "Apple",
+    "Samsung",
+    "Sennheiser",
+    "Bowers & Wilkins",
+    "Jabra",
+    "Nothing",
+    "Anker",
+    "JBL",
+    "Marshall",
+    "Bang & Olufsen",
+    "Sonos",
+    "KEF",
+    "Focal",
+    "Audio-Technica",
+    "Shure",
+    "Beyerdynamic",
+    "Google",
+    "OnePlus",
+    "Xiaomi",
+    "Huawei",
+    "DJI",
+    "GoPro",
+    "Garmin",
+    "Fitbit",
+    "Oura",
+    "Dyson",
+    "Meta",
+    "Razer",
+    "Logitech",
+    "SteelSeries",
+    "Corsair",
+    "HyperX",
+    "Rode",
+    "FiiO",
+    "Moondrop",
+    "Shanling",
+    "iFi",
+    "Topping",
+    "Framework",
+    "Lenovo",
+    "Dell",
+    "ASUS",
+    "Acer",
+    "HP",
+    "Nintendo",
+    "Valve",
+    "PlayStation",
+    "Xbox",
+    "Ray-Ban",
+    "Xreal",
+    "TCL",
+    "Amazfit",
+    "OpenAI",
+    "Anthropic",
+    "Google DeepMind",
+    "Mistral",
+    "Meta AI",
+    "Microsoft Copilot",
+    "Perplexity",
+    "Midjourney",
+    "Stability AI",
+    "Cohere",
+    "Groq",
+    "Cerebras",
+    "NVIDIA",
+    "AMD",
+    "Intel",
+    "Hugging Face",
+    "Runway",
+    "ElevenLabs",
+    "Suno",
+    "IBM Quantum",
+    "IonQ",
+    "Rigetti",
+    "D-Wave",
+    "IQM",
+    "PsiQuantum",
+    "QuEra",
+    "Pasqal",
+    "Xanadu",
+    "arXiv",
+    "Nature",
+    "IEEE",
+    "DeepSeek"
+  ],
+  "noise_patterns": [
+    "deal",
+    "deals",
+    "sale ",
+    "sales",
+    "save ",
+    "saving",
+    "discount",
+    "% off",
+    "coupon",
+    "promo",
+    "black friday",
+    "prime day",
+    "spring sale",
+    "how to",
+    "tip:",
+    "tips for",
+    "guide to setup",
+    "top stories",
+    "icymi",
+    "this week in",
+    "morning after",
+    "weekly roundup",
+    "apple @ work",
+    "tax season",
+    "delete your data",
+    "lawsuit",
+    "sued",
+    "antitrust",
+    "regulation",
+    "earnings",
+    "stock price",
+    "investor",
+    "quarterly",
+    "vpn",
+    "nordvpn",
+    "password manager",
+    "cardpointers"
+  ],
+  "product_signals": [
+    "review",
+    "hands-on",
+    "first look",
+    "unboxing",
+    "tested",
+    "compared",
+    "launched",
+    "launches",
+    "announced",
+    "unveils",
+    "reveals",
+    "introduces",
+    "all-new",
+    "next-gen",
+    "release date",
+    "available now",
+    "pre-order"
+  ]
+}

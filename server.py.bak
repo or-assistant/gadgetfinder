@@ -1,0 +1,220 @@
+"""P22 GADGETFINDER — Gadget-News-Aggregator. Minimalistisch, nur Neues."""
+import json, os, time, re, hashlib, sqlite3
+from pathlib import Path
+from datetime import datetime, timezone, timedelta
+from fastapi import FastAPI, Query, Request
+from fastapi.responses import HTMLResponse, Response
+import uvicorn
+
+BASE = Path(__file__).parent
+DB_PATH = BASE / "data" / "gadgets.db"
+FEEDS_PATH = BASE / "data" / "feeds.json"
+
+app = FastAPI()
+
+def get_db():
+    db = sqlite3.connect(str(DB_PATH))
+    db.row_factory = sqlite3.Row
+    db.execute("PRAGMA journal_mode=WAL")
+    return db
+
+def init_db():
+    db = get_db()
+    db.executescript("""
+        CREATE TABLE IF NOT EXISTS articles (
+            id TEXT PRIMARY KEY,
+            title TEXT NOT NULL,
+            url TEXT NOT NULL,
+            source TEXT NOT NULL,
+            category TEXT DEFAULT 'gadgets',
+            brand TEXT,
+            summary TEXT,
+            image_url TEXT,
+            published TEXT,
+            fetched TEXT,
+            score INTEGER DEFAULT 0
+        );
+        CREATE INDEX IF NOT EXISTS idx_published ON articles(published DESC);
+        CREATE INDEX IF NOT EXISTS idx_category ON articles(category);
+    """)
+    db.close()
+
+init_db()
+
+def load_config():
+    with open(FEEDS_PATH) as f:
+        return json.load(f)
+
+def fetch_feeds():
+    import feedparser
+    config = load_config()
+    keywords = config["keywords"]
+    brands = [b.lower() for b in config["brands_watchlist"]]
+    db = get_db()
+    new_count = 0
+    for feed_cfg in config["feeds"]:
+        try:
+            feed = feedparser.parse(feed_cfg["url"])
+            for entry in feed.entries[:30]:
+                title = entry.get("title", "").strip()
+                url = entry.get("link", "").strip()
+                if not title or not url:
+                    continue
+                art_id = hashlib.md5(url.encode()).hexdigest()[:16]
+                if db.execute("SELECT 1 FROM articles WHERE id=?", (art_id,)).fetchone():
+                    continue
+                summary = entry.get("summary", "")[:500] or ""
+                text = (title + " " + summary).lower()
+                matched = False
+                matched_cat = "gadgets"
+                score = 0
+                matched_brand = None
+                for b in brands:
+                    if b in text:
+                        matched_brand = b.title()
+                        score += 20
+                        matched = True
+                        break
+                for cat, cat_kws in keywords.items():
+                    for kw in cat_kws:
+                        if kw in text:
+                            matched = True
+                            matched_cat = cat
+                            score += 10
+                            break
+                    if matched:
+                        break
+                if not matched:
+                    continue
+                score += (4 - feed_cfg.get("tier", 3)) * 5
+                pub = ""
+                if hasattr(entry, "published_parsed") and entry.published_parsed:
+                    try:
+                        pub = datetime(*entry.published_parsed[:6]).isoformat()
+                    except Exception:
+                        pass
+                if not pub:
+                    pub = datetime.now(timezone.utc).isoformat()
+                img = ""
+                if hasattr(entry, "media_content") and entry.media_content:
+                    img = entry.media_content[0].get("url", "")
+                elif hasattr(entry, "media_thumbnail") and entry.media_thumbnail:
+                    img = entry.media_thumbnail[0].get("url", "")
+                db.execute("""INSERT OR IGNORE INTO articles (id,title,url,source,category,brand,summary,image_url,published,fetched,score)
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
+                    (art_id, title, url, feed_cfg["name"], matched_cat, matched_brand, summary[:300], img, pub, datetime.now(timezone.utc).isoformat(), score))
+                new_count += 1
+        except Exception as e:
+            print(f"Feed error {feed_cfg['name']}: {e}")
+    db.commit()
+    db.close()
+    return new_count
+
+CAT_ICONS = {"audio":"🎧","wearables":"⌚","mobile":"📱","smarthome":"🏠","gaming":"🎮","power":"🔋","desk":"🖥️","gadgets":"📦"}
+
+def date_label(date_str):
+    try:
+        d = datetime.fromisoformat(date_str.replace("Z","+00:00"))
+        now = datetime.now(timezone.utc)
+        if d.date() == now.date():
+            return "Heute"
+        if d.date() == (now - timedelta(days=1)).date():
+            return "Gestern"
+        return d.strftime("%a, %d. %B")
+    except:
+        return ""
+
+@app.get("/", response_class=HTMLResponse)
+async def index(request: Request, cat: str = Query("all"), brand: str = Query("")):
+    db = get_db()
+    config = load_config()
+    
+    if brand:
+        rows = db.execute("SELECT * FROM articles WHERE brand LIKE ? ORDER BY published DESC LIMIT 60", (f"%{brand}%",)).fetchall()
+    elif cat != "all":
+        rows = db.execute("SELECT * FROM articles WHERE category=? ORDER BY published DESC LIMIT 60", (cat,)).fetchall()
+    else:
+        rows = db.execute("SELECT * FROM articles ORDER BY published DESC LIMIT 60").fetchall()
+    
+    total = db.execute("SELECT COUNT(*) FROM articles").fetchone()[0]
+    db.close()
+    
+    categories = list(config["keywords"].keys())
+    brands_list = config["brands_watchlist"][:12]
+    
+    # Build cards grouped by date
+    cards_html = ""
+    prev_date = ""
+    for r in rows:
+        pub = r["published"][:10] if r["published"] else ""
+        label = date_label(r["published"])
+        if label and label != prev_date:
+            cards_html += f'<div class="sep">{label}</div>'
+            prev_date = label
+        
+        icon = CAT_ICONS.get(r["category"], "📦")
+        brand_html = f'<span class="pill brand">{r["brand"]}</span>' if r["brand"] else ""
+        src_html = f'<span class="pill src">{r["source"]}</span>'
+        cat_html = f'<span class="pill cat">{icon}</span>'
+        
+        cards_html += f'''<a href="{r["url"]}" target="_blank" rel="noopener" class="item">
+<div class="item-main"><span class="item-title">{r["title"]}</span></div>
+<div class="item-meta">{cat_html}{brand_html}{src_html}</div></a>'''
+    
+    if not cards_html:
+        cards_html = '<div class="empty">Keine Artikel. <a href="/refresh">Feeds laden</a></div>'
+    
+    # Category chips
+    chip = lambda id, label, active: f'<a href="/?cat={id}" class="c{" on" if id == cat and not brand else ""}">{label}</a>'
+    cat_bar = chip("all", "Alle", cat == "all") + "".join(chip(c, f"{CAT_ICONS.get(c,'')} {c.title()}", False) for c in categories)
+    brand_bar = "".join(f'<a href="/?brand={b}" class="c b{" on" if b.lower() == brand.lower() else ""}">{b}</a>' for b in brands_list)
+    
+    return HTMLResponse(f"""<!DOCTYPE html><html lang="de"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Gadgetfinder</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎧</text></svg>">
+<style>
+*{{margin:0;padding:0;box-sizing:border-box}}
+body{{font-family:system-ui,sans-serif;background:#08080c;color:#e0dcd4;min-height:100vh}}
+.w{{max-width:640px;margin:0 auto;padding:.8rem}}
+.hd{{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:.6rem}}
+h1{{font-size:1.1rem;font-weight:700}}h1 span{{opacity:.4;font-weight:400;font-size:.75rem}}
+.rf{{font-size:.7rem;color:#888;text-decoration:none;border:1px solid #222;padding:.3rem .6rem;border-radius:4px}}.rf:hover{{color:#c9a84c;border-color:#c9a84c}}
+.bar{{display:flex;gap:.3rem;overflow-x:auto;scrollbar-width:none;padding-bottom:.3rem;margin-bottom:.3rem}}.bar::-webkit-scrollbar{{display:none}}
+.c{{white-space:nowrap;padding:.3rem .6rem;border-radius:14px;border:1px solid #1a1a2a;color:#777;text-decoration:none;font-size:.7rem;flex-shrink:0}}.c:hover,.c.on{{color:#c9a84c;border-color:#c9a84c;background:rgba(201,168,76,.06)}}
+.c.b{{border-color:#1a1a2a;font-size:.65rem}}.c.b.on{{color:#4a9eff;border-color:#4a9eff;background:rgba(74,158,255,.06)}}
+.sep{{font-size:.65rem;color:#c9a84c;font-weight:600;letter-spacing:.1em;text-transform:uppercase;padding:.8rem 0 .2rem}}
+.item{{display:block;padding:.6rem 0;border-bottom:1px solid #111;text-decoration:none;color:inherit}}
+.item:hover .item-title{{color:#c9a84c}}
+.item-title{{font-size:.85rem;line-height:1.4;color:#e0dcd4;transition:color .15s}}
+.item-meta{{display:flex;gap:.3rem;margin-top:.25rem;flex-wrap:wrap}}
+.pill{{font-size:.6rem;padding:.1rem .4rem;border-radius:8px;background:#111;color:#666}}
+.pill.brand{{background:rgba(74,158,255,.08);color:#5aa8ff}}
+.pill.cat{{background:rgba(201,168,76,.08);color:#c9a84c}}
+.empty{{text-align:center;color:#555;padding:3rem;font-size:.85rem}}.empty a{{color:#c9a84c}}
+</style></head><body>
+<div class="w">
+<div class="hd"><h1>🎧 Gadgetfinder <span>{total}</span></h1><a href="/refresh" class="rf">↻ Refresh</a></div>
+<div class="bar">{cat_bar}</div>
+<div class="bar">{brand_bar}</div>
+{cards_html}
+</div></body></html>""")
+
+@app.get("/refresh")
+async def refresh():
+    n = fetch_feeds()
+    return Response(status_code=303, headers={"Location": f"/?refreshed={n}"})
+
+@app.get("/api/health")
+async def health():
+    db = get_db()
+    total = db.execute("SELECT COUNT(*) FROM articles").fetchone()[0]
+    db.close()
+    return {"status": "ok", "articles": total}
+
+if __name__ == "__main__":
+    print(f"Fetching feeds...")
+    n = fetch_feeds()
+    print(f"Fetched {n} new articles")
+    uvicorn.run("server:app", host="127.0.0.1", port=3023, reload=False)

@@ -1,0 +1,751 @@
+"""GadgetFinder - Innovative Gadget News Aggregator."""
+
+import hashlib
+import json
+import os
+import re
+import sqlite3
+from datetime import datetime, timezone
+from html import escape
+from pathlib import Path
+from urllib.parse import urlencode
+
+import feedparser
+import requests
+from fastapi import FastAPI, Request
+from fastapi.responses import HTMLResponse, RedirectResponse
+
+# ---------------------------------------------------------------------------
+# Config
+# ---------------------------------------------------------------------------
+
+BASE = Path(__file__).parent
+DB_PATH = BASE / "data" / "gadgets.db"
+FEEDS_PATH = BASE / "data" / "feeds.json"
+
+CATEGORY_MAP = {
+    "audio":     ("Audio",       "\U0001f3a7", "#6c3fa0", "#3a1f5e"),
+    "wearables": ("Wearables",   "\u231a",     "#2e7d32", "#1b4d1e"),
+    "mobile":    ("Mobile",      "\U0001f4f1", "#1565c0", "#0d3d75"),
+    "smarthome": ("Smart Home",  "\U0001f3e0", "#e65100", "#8a3000"),
+    "gaming":    ("Gaming",      "\U0001f3ae", "#c62828", "#771818"),
+    "computer":  ("Computer",    "\U0001f4bb", "#37474f", "#1c2529"),
+    "vr":        ("VR/AR",       "\U0001f97d", "#7b1fa2", "#4a1262"),
+    "gadgets":   ("Gadgets",     "\U0001f4e6", "#455a64", "#263238"),
+    "ai":        ("KI/AI",       "\U0001f916", "#00897b", "#004d40"),
+}
+
+PRICE_SEGMENTS = {
+    "budget":   ("Budget (<200\u20ac)",     0,    199),
+    "premium":  ("Premium (500\u20ac+)",  500,  99999),
+    "highend":  ("High-End (1000\u20ac+)", 1000, 99999),
+}
+
+SCORE_BADGES = [
+    (80, "Hot",  "#e74c3c"),
+    (60, "Good", "#c9a84c"),
+    (40, "Mid",  "#7f8c8d"),
+    (0,  "Low",  "#555"),
+]
+
+# ---------------------------------------------------------------------------
+# Database
+# ---------------------------------------------------------------------------
+
+def get_db():
+    conn = sqlite3.connect(str(DB_PATH))
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.row_factory = sqlite3.Row
+    conn.execute("""CREATE TABLE IF NOT EXISTS articles (
+        id TEXT PRIMARY KEY, title TEXT NOT NULL, url TEXT NOT NULL,
+        source TEXT NOT NULL, category TEXT DEFAULT 'gadgets', brand TEXT,
+        summary TEXT, image_url TEXT, published TEXT, fetched TEXT,
+        score INTEGER DEFAULT 0
+    )""")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_published ON articles(published DESC)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_category ON articles(category)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_brand ON articles(brand)")
+    return conn
+
+# ---------------------------------------------------------------------------
+# Config loader
+# ---------------------------------------------------------------------------
+
+def load_config():
+    with open(FEEDS_PATH) as f:
+        return json.load(f)
+
+# ---------------------------------------------------------------------------
+# Scoring
+# ---------------------------------------------------------------------------
+
+def compute_score(title, summary, source, brand, image_url, cfg):
+    s = 0
+    text = f"{title} {summary or ''}".lower()
+    if brand:
+        s += 20
+    hits = 0
+    for cat_kws in cfg["keywords"].values():
+        for kw in cat_kws:
+            if kw.lower() in text:
+                hits += 1
+                if hits >= 5:
+                    break
+        if hits >= 5:
+            break
+    s += hits * 10
+    tier_map = {f["name"]: f.get("tier", 3) for f in cfg["feeds"]}
+    tier = tier_map.get(source, 3)
+    s += {1: 15, 2: 10, 3: 5}.get(tier, 5)
+    if image_url:
+        s += 10
+    for sig in ["review", "test", "hands-on", "first look", "tested"]:
+        if sig in text:
+            s += 15
+            break
+    for sig in ["best", "top", " vs ", "comparison", "compared"]:
+        if sig in text:
+            s += 10
+            break
+    return min(s, 100)
+
+# ---------------------------------------------------------------------------
+# Category detection
+# ---------------------------------------------------------------------------
+
+VR_SOURCES = {"Road to VR", "UploadVR"}
+
+def detect_category(title, summary, source, cfg):
+    if source in VR_SOURCES:
+        return "vr"
+    text = f"{title} {summary or ''}".lower()
+    for kw in ["vr headset", "mixed reality", "quest ", "vision pro",
+                "ar glasses", "xr ", "spatial computing", "vr game"]:
+        if kw in text:
+            return "vr"
+    cat_remap = {"desk": "computer", "power": "computer"}
+    for cat, kws in cfg["keywords"].items():
+        for kw in kws:
+            if kw.lower() in text:
+                mapped = cat_remap.get(cat, cat)
+                if mapped in CATEGORY_MAP:
+                    return mapped
+    return "gadgets"
+
+# ---------------------------------------------------------------------------
+# Brand detection
+# ---------------------------------------------------------------------------
+
+def detect_brand(title, summary, cfg):
+    text = f"{title} {summary or ''}"
+    for b in cfg["brands_watchlist"]:
+        if b.lower() in text.lower():
+            return b
+    return None
+
+# ---------------------------------------------------------------------------
+# Price extraction
+# ---------------------------------------------------------------------------
+
+PRICE_RE = re.compile(
+    r'(?:[\$\u20ac\u00a3])\s*(\d[\d,]*(?:\.\d{2})?)'
+    r'|(\d[\d,]*(?:\.\d{2})?)\s*(?:\u20ac|dollars?|USD|EUR)',
+    re.IGNORECASE,
+)
+
+def extract_price(title, summary):
+    text = f"{title} {summary or ''}"
+    for m in PRICE_RE.finditer(text):
+        raw = m.group(1) or m.group(2)
+        try:
+            return int(float(raw.replace(",", "")))
+        except (ValueError, TypeError):
+            continue
+    return None
+
+# ---------------------------------------------------------------------------
+# Noise filter
+# ---------------------------------------------------------------------------
+
+def is_noise(title, cfg):
+    t = title.lower()
+    noise_hit = any(p in t for p in cfg["noise_patterns"])
+    if not noise_hit:
+        return False
+    signals = sum(1 for s in cfg["product_signals"] if s in t)
+    return signals < 2
+
+# ---------------------------------------------------------------------------
+# Feed fetcher
+# ---------------------------------------------------------------------------
+
+def fetch_feeds():
+    cfg = load_config()
+    db = get_db()
+    added = 0
+    for feed_cfg in cfg["feeds"]:
+        try:
+            d = feedparser.parse(feed_cfg["url"])
+        except Exception:
+            continue
+        for entry in d.entries[:30]:
+            url = getattr(entry, "link", "")
+            if not url:
+                continue
+            aid = hashlib.md5(url.encode()).hexdigest()
+            if db.execute("SELECT 1 FROM articles WHERE id=?", (aid,)).fetchone():
+                continue
+            title = getattr(entry, "title", "").strip()
+            if not title or is_noise(title, cfg):
+                continue
+            summary_raw = getattr(entry, "summary", "") or ""
+            summary = re.sub(r"<[^>]+>", "", summary_raw)[:300].strip()
+            source = feed_cfg["name"]
+            brand = detect_brand(title, summary, cfg)
+            category = detect_category(title, summary, source, cfg)
+            text = f"{title} {summary}".lower()
+            has_keyword = any(
+                kw.lower() in text
+                for kws in cfg["keywords"].values()
+                for kw in kws
+            )
+            if not brand and not has_keyword:
+                continue
+            image_url = None
+            for link in getattr(entry, "links", []):
+                if link.get("type", "").startswith("image"):
+                    image_url = link["href"]
+                    break
+            if not image_url:
+                for enc in getattr(entry, "enclosures", []):
+                    if enc.get("type", "").startswith("image"):
+                        image_url = enc.get("href") or enc.get("url")
+                        break
+            if not image_url:
+                media = getattr(entry, "media_content", [])
+                if media:
+                    image_url = media[0].get("url")
+            if not image_url:
+                media_thumb = getattr(entry, "media_thumbnail", [])
+                if media_thumb:
+                    image_url = media_thumb[0].get("url")
+            pub = getattr(entry, "published_parsed", None)
+            if pub:
+                published = datetime(*pub[:6], tzinfo=timezone.utc).isoformat()
+            else:
+                published = datetime.now(timezone.utc).isoformat()
+            score = compute_score(title, summary, source, brand, image_url, cfg)
+            try:
+                db.execute(
+                    "INSERT INTO articles VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                    (aid, title, url, source, category, brand, summary,
+                     image_url, published, datetime.now(timezone.utc).isoformat(), score),
+                )
+                added += 1
+            except sqlite3.IntegrityError:
+                pass
+    db.commit()
+    db.close()
+    return added
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def esc(s):
+    return escape(str(s)) if s else ""
+
+def strip_dashes(s):
+    return s.replace("\u2014", " ").replace("\u2013", " ") if s else s
+
+def format_date(iso):
+    try:
+        dt = datetime.fromisoformat(iso)
+    except (ValueError, TypeError):
+        return ""
+    now = datetime.now(timezone.utc)
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    diff = now.date() - dt.date()
+    if diff.days == 0:
+        return "Heute"
+    if diff.days == 1:
+        return "Gestern"
+    return dt.strftime("%d.%m.%Y")
+
+def score_badge(score):
+    for threshold, label, color in SCORE_BADGES:
+        if score >= threshold:
+            return label, color
+    return "Low", "#555"
+
+BASE_PATH = os.environ.get("BASE_PATH", "")  # Set to "/gadgetfinder" when behind Caddy
+
+def build_filter_url(current_params, key, value):
+    params = dict(current_params)
+    if value is None or params.get(key) == value:
+        params.pop(key, None)
+    else:
+        params[key] = value
+    base = BASE_PATH + "/"
+    if not params:
+        return base
+    return base + "?" + urlencode(params)
+
+def price_badge(price):
+    if price is None:
+        return ""
+    if price >= 1000:
+        return (f'<span style="background:#8b5e0a;color:#ffd;font-size:11px;'
+                f'padding:2px 6px;border-radius:4px;margin-left:4px">{price}\u20ac</span>')
+    if price >= 500:
+        return (f'<span style="background:#5a3e0a;color:#ffd;font-size:11px;'
+                f'padding:2px 6px;border-radius:4px;margin-left:4px">{price}\u20ac</span>')
+    return (f'<span style="background:#333;color:#aaa;font-size:11px;'
+            f'padding:2px 6px;border-radius:4px;margin-left:4px">{price}\u20ac</span>')
+
+# ---------------------------------------------------------------------------
+# HTML rendering
+# ---------------------------------------------------------------------------
+
+CSS = """
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#08080c;color:#e0dcd4;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
+a{color:#e0dcd4;text-decoration:none}
+.wrap{max-width:640px;margin:0 auto;padding:0 12px 40px}
+header{padding:16px 0 8px;text-align:center}
+header h1{font-size:20px;font-weight:700;color:#c9a84c;letter-spacing:1px}
+header p{font-size:12px;color:#777;margin-top:2px}
+.sticky{position:sticky;top:0;z-index:100;background:#08080c;padding:8px 0 4px;
+  border-bottom:1px solid #1a1a22}
+.chip-row{display:flex;gap:6px;overflow-x:auto;padding:4px 0;scrollbar-width:none;
+  -ms-overflow-style:none}
+.chip-row::-webkit-scrollbar{display:none}
+.chip{display:inline-flex;align-items:center;padding:6px 14px;border-radius:20px;
+  font-size:13px;font-weight:500;white-space:nowrap;background:#16161e;color:#999;
+  border:1px solid #222;transition:all .15s}
+.chip:hover{background:#1e1e28;color:#ccc}
+.chip.on{background:#c9a84c;color:#08080c;border-color:#c9a84c;font-weight:600}
+.section-title{font-size:14px;font-weight:600;color:#777;text-transform:uppercase;
+  letter-spacing:1.5px;margin:20px 0 10px;padding-left:2px}
+.hero{border-radius:12px;overflow:hidden;margin:12px 0 16px;background:#12121a;
+  border:1px solid #1e1e28;position:relative}
+.hero img{width:100%;height:200px;object-fit:cover;display:block}
+.hero-placeholder{width:100%;height:200px;display:flex;align-items:center;
+  justify-content:center;font-size:48px}
+.hero-body{padding:14px 16px}
+.hero-body h2{font-size:17px;font-weight:600;line-height:1.35;margin-bottom:6px}
+.hero-body h2 a{color:#e0dcd4}
+.hero-body h2 a:hover{color:#c9a84c}
+.hero-meta{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:12px;color:#777}
+.trending{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px}
+.tcard{background:#12121a;border-radius:10px;overflow:hidden;border:1px solid #1e1e28}
+.tcard img{width:100%;height:90px;object-fit:cover;display:block}
+.tcard-placeholder{width:100%;height:90px;display:flex;align-items:center;
+  justify-content:center;font-size:28px}
+.tcard-body{padding:8px 10px}
+.tcard-body h3{font-size:13px;font-weight:600;line-height:1.3}
+.tcard-body h3 a{color:#e0dcd4}
+.tcard-body h3 a:hover{color:#c9a84c}
+.tcard-meta{font-size:11px;color:#777;margin-top:4px;display:flex;gap:4px;align-items:center}
+.date-sep{font-size:12px;font-weight:600;color:#555;text-transform:uppercase;
+  letter-spacing:1px;margin:18px 0 8px;padding-left:2px}
+.card{display:flex;gap:12px;padding:12px;background:#12121a;border-radius:10px;
+  margin-bottom:8px;border:1px solid #1e1e28;align-items:flex-start}
+.card:hover{border-color:#2a2a36}
+.card-img{width:80px;height:80px;border-radius:8px;object-fit:cover;flex-shrink:0}
+.card-placeholder{width:80px;height:80px;border-radius:8px;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;font-size:24px}
+.card-content{flex:1;min-width:0}
+.card-title{font-size:14px;font-weight:600;line-height:1.35;margin-bottom:4px;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.card-title a{color:#e0dcd4}
+.card-title a:hover{color:#c9a84c}
+.card-summary{font-size:12px;color:#888;line-height:1.4;margin-bottom:6px;
+  display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}
+.card-meta{display:flex;align-items:center;gap:5px;flex-wrap:wrap;font-size:11px;color:#666}
+.card-vote{display:flex;gap:8px;margin-top:6px}
+.vote-btn{text-decoration:none;font-size:16px;opacity:.3;transition:opacity .2s}
+.vote-btn:hover{opacity:.8}
+.vote-btn.voted{opacity:1}
+.vote-btn.voted-down{opacity:1}
+.badge{padding:2px 7px;border-radius:4px;font-size:11px;font-weight:500}
+.badge-brand{background:#1a2e4a;color:#4a9eff}
+.badge-score{color:#fff}
+.badge-source{background:#1a1a22;color:#777}
+.badge-new{background:#2a1a0a;color:#c9a84c}
+.badge-cat{background:#1a1a22;color:#888}
+.footer{text-align:center;padding:24px 0;font-size:12px;color:#444}
+.refresh-bar{display:flex;justify-content:center;padding:8px 0}
+.refresh-btn{display:inline-flex;align-items:center;gap:6px;padding:8px 20px;
+  background:#16161e;color:#999;border-radius:20px;font-size:13px;border:1px solid #222}
+.refresh-btn:hover{background:#1e1e28;color:#ccc;border-color:#333}
+.empty{text-align:center;padding:40px 16px;color:#555;font-size:14px}
+"""
+
+def render_placeholder(category, variant="card"):
+    info = CATEGORY_MAP.get(category, CATEGORY_MAP["gadgets"])
+    icon, c1, c2 = info[1], info[2], info[3]
+    return (f'<div class="{variant}-placeholder" '
+            f'style="background:linear-gradient(135deg,{c1},{c2})">{icon}</div>')
+
+def render_hero(article, params):
+    title = esc(strip_dashes(article["title"]))
+    price = extract_price(article["title"], article["summary"])
+    badge_label, badge_color = score_badge(article["score"])
+    cat_info = CATEGORY_MAP.get(article["category"], CATEGORY_MAP["gadgets"])
+    img_html = (f'<img src="{esc(article["image_url"])}" alt="" loading="lazy">'
+                if article["image_url"]
+                else render_placeholder(article["category"], "hero"))
+    brand_html = (f'<span class="badge badge-brand">{esc(article["brand"])}</span>'
+                  if article["brand"] else "")
+    return f'''<div class="hero">
+  <a href="{esc(article["url"])}" target="_blank" rel="noopener">{img_html}</a>
+  <div class="hero-body">
+    <h2><a href="{esc(article["url"])}" target="_blank" rel="noopener">{title}</a></h2>
+    <div class="hero-meta">
+      <span class="badge badge-score" style="background:{badge_color}">{badge_label} {article["score"]}</span>
+      {brand_html}
+      <span class="badge badge-source">{esc(article["source"])}</span>
+      <span>{cat_info[1]} {cat_info[0]}</span>
+      {price_badge(price)}
+    </div>
+  </div>
+</div>'''
+
+def render_tcard(article):
+    title = esc(strip_dashes(article["title"]))
+    badge_label, badge_color = score_badge(article["score"])
+    img_html = (f'<img src="{esc(article["image_url"])}" alt="" loading="lazy">'
+                if article["image_url"]
+                else render_placeholder(article["category"], "tcard"))
+    return f'''<div class="tcard">
+  <a href="{esc(article["url"])}" target="_blank" rel="noopener">{img_html}</a>
+  <div class="tcard-body">
+    <h3><a href="{esc(article["url"])}" target="_blank" rel="noopener">{title}</a></h3>
+    <div class="tcard-meta">
+      <span class="badge badge-score" style="background:{badge_color}">{badge_label}</span>
+      <span>{esc(article["source"])}</span>
+    </div>
+  </div>
+</div>'''
+
+def render_card(article):
+    title = esc(strip_dashes(article["title"]))
+    summary = esc(strip_dashes(article["summary"] or ""))
+    price = extract_price(article["title"], article["summary"])
+    badge_label, badge_color = score_badge(article["score"])
+    cat_info = CATEGORY_MAP.get(article["category"], CATEGORY_MAP["gadgets"])
+    img_html = (f'<img class="card-img" src="{esc(article["image_url"])}" alt="" loading="lazy">'
+                if article["image_url"]
+                else render_placeholder(article["category"], "card"))
+    brand_html = (f'<span class="badge badge-brand">{esc(article["brand"])}</span>'
+                  if article["brand"] else "")
+    is_new = False
+    try:
+        pub = datetime.fromisoformat(article["published"])
+        if pub.tzinfo is None:
+            pub = pub.replace(tzinfo=timezone.utc)
+        is_new = (datetime.now(timezone.utc) - pub).total_seconds() < 86400
+    except (ValueError, TypeError):
+        pass
+    new_html = '<span class="badge badge-new">Neu</span>' if is_new else ""
+    return f'''<div class="card">
+  {img_html}
+  <div class="card-content">
+    <div class="card-title"><a href="{esc(article["url"])}" target="_blank" rel="noopener">{title}</a></div>
+    <div class="card-summary">{summary}</div>
+    <div class="card-meta">
+      <span class="badge badge-score" style="background:{badge_color}">{badge_label}</span>
+      {brand_html}
+      <span class="badge badge-source">{esc(article["source"])}</span>
+      <span class="badge badge-cat">{cat_info[1]}</span>
+      {price_badge(price)}
+      {new_html}
+    </div>
+    <div class="card-vote">
+      <a href="{BASE_PATH}/vote/{article["id"]}/up" class="vote-btn{" voted" if article.get("vote") == 1 else ""}" title="Relevant">👍</a>
+      <a href="{BASE_PATH}/vote/{article["id"]}/down" class="vote-btn{" voted-down" if article.get("vote") == -1 else ""}" title="Irrelevant">👎</a>
+    </div>
+  </div>
+</div>'''
+
+# ---------------------------------------------------------------------------
+# App
+# ---------------------------------------------------------------------------
+
+app = FastAPI(title="GadgetFinder", docs_url=None, redoc_url=None)
+
+
+@app.get("/", response_class=HTMLResponse)
+def index(request: Request):
+    params = dict(request.query_params)
+    active_cat = params.get("cat")
+    active_brand = params.get("brand")
+    active_price = params.get("price")
+
+    cfg = load_config()
+    db = get_db()
+
+    rows = db.execute("SELECT * FROM articles ORDER BY published DESC LIMIT 300").fetchall()
+    articles = []
+    for r in rows:
+        a = dict(r)
+        a["score"] = compute_score(a["title"], a["summary"], a["source"],
+                                   a["brand"], a["image_url"], cfg)
+        a["category"] = detect_category(a["title"], a["summary"], a["source"], cfg)
+        if not a["brand"]:
+            a["brand"] = detect_brand(a["title"], a["summary"], cfg)
+        articles.append(a)
+
+    db.close()
+
+    # Apply filters
+    if active_cat and active_cat in CATEGORY_MAP:
+        articles = [a for a in articles if a["category"] == active_cat]
+    if active_brand:
+        articles = [a for a in articles
+                    if a["brand"] and a["brand"].lower() == active_brand.lower()]
+    if active_price and active_price in PRICE_SEGMENTS:
+        seg = PRICE_SEGMENTS[active_price]
+        filtered = []
+        for a in articles:
+            p = extract_price(a["title"], a["summary"])
+            if p is None:
+                filtered.append(a)
+            elif seg[1] <= p <= seg[2]:
+                filtered.append(a)
+        articles = filtered
+
+    by_score = sorted(articles, key=lambda a: a["score"], reverse=True)
+
+    # Brand chips
+    brand_counts = {}
+    for a in articles:
+        if a["brand"]:
+            brand_counts[a["brand"]] = brand_counts.get(a["brand"], 0) + 1
+    top_brands = sorted(brand_counts.keys(),
+                        key=lambda b: brand_counts[b], reverse=True)[:12]
+
+    # Hero
+    hero_article = by_score[0] if by_score else None
+    hero_ids = {hero_article["id"]} if hero_article else set()
+
+    # Trending
+    trending = [a for a in by_score if a["id"] not in hero_ids][:4]
+    trending_ids = {a["id"] for a in trending} | hero_ids
+
+    # Feed
+    feed = [a for a in articles if a["id"] not in trending_ids]
+    feed.sort(key=lambda a: a.get("published", ""), reverse=True)
+    feed = feed[:60]
+
+    # Build HTML
+    parts = [f'''<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>GadgetFinder</title>
+<style>{CSS}</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>GadgetFinder</h1>
+  <p>{len(articles)} Gadgets gefunden</p>
+</header>
+''']
+
+    # Sticky filter bar
+    parts.append('<div class="sticky">')
+
+    # Category chips
+    parts.append('<div class="chip-row">')
+    parts.append(f'<a class="chip{"" if active_cat else " on"}" '
+                 f'href="{build_filter_url(params, "cat", None)}">Alle</a>')
+    for ckey, cinfo in CATEGORY_MAP.items():
+        on = " on" if active_cat == ckey else ""
+        href = build_filter_url(params, "cat", ckey)
+        parts.append(f'<a class="chip{on}" href="{href}">{cinfo[1]} {cinfo[0]}</a>')
+    parts.append('</div>')
+
+    # Price chips
+    parts.append('<div class="chip-row" style="margin-top:4px">')
+    parts.append(f'<a class="chip{"" if active_price else " on"}" '
+                 f'href="{build_filter_url(params, "price", None)}">Alle Preise</a>')
+    for pkey, pinfo in PRICE_SEGMENTS.items():
+        on = " on" if active_price == pkey else ""
+        href = build_filter_url(params, "price", pkey)
+        parts.append(f'<a class="chip{on}" href="{href}">{pinfo[0]}</a>')
+    parts.append('</div>')
+
+    # Brand chips
+    if top_brands:
+        parts.append('<div class="chip-row" style="margin-top:4px">')
+        parts.append(f'<a class="chip{"" if active_brand else " on"}" '
+                     f'href="{build_filter_url(params, "brand", None)}">Alle Marken</a>')
+        for b in top_brands:
+            on = " on" if active_brand and active_brand.lower() == b.lower() else ""
+            href = build_filter_url(params, "brand", b)
+            parts.append(f'<a class="chip{on}" href="{href}">{esc(b)}</a>')
+        parts.append('</div>')
+
+    parts.append('</div>')
+
+    # Refresh
+    parts.append('<div class="refresh-bar">'
+                 f'<a class="refresh-btn" href="{BASE_PATH}/refresh">'
+                 '\U0001f504 Aktualisieren</a>'
+                 f'<a class="refresh-btn" href="{BASE_PATH}/stats">'
+                 '\U0001f4ca Quellen-Report</a></div>')
+
+    if not articles:
+        parts.append('<div class="empty">Keine Gadgets gefunden. '
+                     'Versuche andere Filter.</div>')
+    else:
+        if hero_article:
+            parts.append('<div class="section-title">'
+                         '\U0001f525 Trending #1</div>')
+            parts.append(render_hero(hero_article, params))
+
+        if trending:
+            parts.append('<div class="section-title">'
+                         '\U0001f4c8 Top Gadgets</div>')
+            parts.append('<div class="trending">')
+            for a in trending:
+                parts.append(render_tcard(a))
+            parts.append('</div>')
+
+        if feed:
+            parts.append('<div class="section-title">'
+                         '\U0001f4f0 Alle Artikel</div>')
+            last_date = None
+            for a in feed:
+                d = format_date(a.get("published", ""))
+                if d and d != last_date:
+                    parts.append(f'<div class="date-sep">{d}</div>')
+                    last_date = d
+                parts.append(render_card(a))
+
+    parts.append('''
+<div class="footer">GadgetFinder &middot; Daten von 22 Tech-Quellen</div>
+</div>
+</body>
+</html>''')
+
+    return HTMLResponse("".join(parts))
+
+
+@app.get("/refresh")
+def refresh():
+    count = fetch_feeds()
+    return RedirectResponse(f"{BASE_PATH}/?refreshed={count}", status_code=303)
+
+
+@app.get("/vote/{article_id}/{direction}")
+def vote(article_id: str, direction: str, request: Request):
+    """Daumen hoch (+1) oder runter (-1) fuer einen Artikel."""
+    if direction not in ("up", "down"):
+        return {"ok": False}
+    val = 1 if direction == "up" else -1
+    db = get_db()
+    db.execute("UPDATE articles SET vote = ? WHERE id = ?", (val, article_id))
+    # Update source stats
+    row = db.execute("SELECT source FROM articles WHERE id = ?", (article_id,)).fetchone()
+    if row:
+        source = row[0]
+        db.execute("""INSERT INTO source_stats (source, total_shown, upvotes, downvotes)
+            VALUES (?, 0, 0, 0) ON CONFLICT(source) DO NOTHING""", (source,))
+        if val == 1:
+            db.execute("UPDATE source_stats SET upvotes = upvotes + 1 WHERE source = ?", (source,))
+        else:
+            db.execute("UPDATE source_stats SET downvotes = downvotes + 1 WHERE source = ?", (source,))
+        stats = db.execute("SELECT upvotes, downvotes FROM source_stats WHERE source = ?", (source,)).fetchone()
+        total_votes = (stats[0] or 0) + (stats[1] or 0)
+        rate = (stats[0] or 0) / total_votes if total_votes > 0 else 0
+        db.execute("UPDATE source_stats SET approval_rate = ? WHERE source = ?", (round(rate, 3), source))
+    db.commit()
+    db.close()
+    return RedirectResponse(request.headers.get("referer", f"{BASE_PATH}/"), status_code=303)
+
+
+@app.get("/stats")
+def source_stats_page():
+    """Wochenbericht: Welche Quellen performen gut/schlecht?"""
+    db = get_db()
+    # Aggregate votes per source
+    stats = db.execute("""
+        SELECT source,
+            COUNT(*) as total,
+            SUM(CASE WHEN vote = 1 THEN 1 ELSE 0 END) as ups,
+            SUM(CASE WHEN vote = -1 THEN 1 ELSE 0 END) as downs,
+            SUM(CASE WHEN vote = 0 THEN 1 ELSE 0 END) as unrated
+        FROM articles
+        GROUP BY source
+        ORDER BY total DESC
+    """).fetchall()
+    db.close()
+
+    rows_html = ""
+    for s in stats:
+        total_votes = (s[2] or 0) + (s[3] or 0)
+        rate = round((s[2] or 0) / total_votes * 100) if total_votes > 0 else -1
+        if rate >= 70:
+            color = "#2e7d32"
+            label = "Gut"
+        elif rate >= 40:
+            color = "#c9a84c"
+            label = "OK"
+        elif rate >= 0 and total_votes > 0:
+            color = "#c62828"
+            label = "Schlecht"
+        else:
+            color = "#555"
+            label = "Keine Votes"
+        rows_html += f'''<tr>
+            <td>{escape(s[0])}</td><td>{s[1]}</td>
+            <td style="color:#2e7d32">{s[2] or 0}</td>
+            <td style="color:#c62828">{s[3] or 0}</td>
+            <td>{s[4] or 0}</td>
+            <td style="color:{color};font-weight:600">{rate}% {label if total_votes > 0 else label}</td>
+        </tr>'''
+
+    return HTMLResponse(f"""<!DOCTYPE html><html lang="de"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Gadgetfinder: Quellen-Report</title>
+<style>
+*{{margin:0;padding:0;box-sizing:border-box}}
+body{{font-family:system-ui,sans-serif;background:#08080c;color:#e0dcd4;padding:1rem}}
+.w{{max-width:700px;margin:0 auto}}
+h1{{font-size:1.2rem;margin-bottom:.5rem;color:#c9a84c}}
+p{{font-size:.8rem;color:#888;margin-bottom:1rem}}
+a{{color:#c9a84c;text-decoration:none}}
+table{{width:100%;border-collapse:collapse;font-size:.8rem}}
+th{{text-align:left;padding:.5rem;border-bottom:1px solid #222;color:#888;font-weight:500}}
+td{{padding:.4rem .5rem;border-bottom:1px solid #111}}
+tr:hover{{background:#111}}
+</style></head><body>
+<div class="w">
+<h1>📊 Quellen-Report</h1>
+<p>Bewertungen deiner Artikel-Votes. Quellen mit niedriger Zustimmungsrate (&lt;40%) sollten evaluiert werden. <a href="{BASE_PATH}/">Zurueck</a></p>
+<table>
+<tr><th>Quelle</th><th>Artikel</th><th>👍</th><th>👎</th><th>Unbewertet</th><th>Zustimmung</th></tr>
+{rows_html}
+</table>
+</div></body></html>""")
+
+
+@app.get("/api/health")
+def health():
+    db = get_db()
+    count = db.execute("SELECT COUNT(*) FROM articles").fetchone()[0]
+    voted = db.execute("SELECT COUNT(*) FROM articles WHERE vote != 0").fetchone()[0]
+    db.close()
+    return {"status": "ok", "articles": count, "voted": voted}
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="127.0.0.1", port=3023)
