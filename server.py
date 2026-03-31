@@ -682,12 +682,11 @@ a{color:var(--text);text-decoration:none}
 .hero-placeholder{width:100%;padding:20px 0;display:flex;align-items:center;
   justify-content:center;font-size:40px}
 .hero-overlay{padding:12px 16px 14px}
-.hero-overlay h2{font-size:20px;font-weight:700;line-height:1.3;color:#fff;margin-bottom:6px}
-.hero-overlay h2 a{color:#fff}
+.hero-overlay h2{font-size:16px;font-weight:700;line-height:1.3;color:#f0f0f0;margin-bottom:4px}
+.hero-overlay h2 a{color:#f0f0f0}
 .hero-overlay-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px;color:rgba(255,255,255,0.7)}
-.hero-score{position:absolute;top:12px;right:12px;padding:4px 10px;border-radius:8px;
-  font-size:12px;font-weight:600;color:#fff;backdrop-filter:blur(10px);
-  -webkit-backdrop-filter:blur(10px);background:rgba(0,0,0,0.5)}
+.hero-score{display:inline-block;padding:3px 8px;border-radius:6px;
+  font-size:11px;font-weight:600;color:#fff}
 .hero-source{font-size:12px;color:rgba(255,255,255,0.6)}
 /* Card grid */
 .card-grid{display:grid;grid-template-columns:1fr;gap:8px}
@@ -787,16 +786,14 @@ def render_hero(article, params):
     brand_html = (f'<span class="badge badge-brand">{esc(article["brand"])}</span>'
                   if article["brand"] else "")
     return f'''<div class="hero">
-  <div class="hero-img-wrap">
-    <a href="{esc(article["url"])}" target="_blank" rel="noopener">{img_html}</a>
-    <span class="hero-score" style="background:{badge_color}cc">{badge_label} {article["score"]}</span>
-    <div class="hero-overlay">
-      <h2><a href="{esc(article["url"])}" target="_blank" rel="noopener">{title}</a></h2>
-      <div class="hero-overlay-meta">
-        <span>{esc(article["source"])}</span>
-        {brand_html}
-        <span>{cat_info[1]} {cat_info[0]}</span>
-      </div>
+  <a href="{esc(article["url"])}" target="_blank" rel="noopener">{img_html}</a>
+  <div class="hero-overlay">
+    <h2><a href="{esc(article["url"])}" target="_blank" rel="noopener">{title}</a></h2>
+    <div class="hero-overlay-meta">
+      <span>{esc(article["source"])}</span>
+      {brand_html}
+      <span>{cat_info[1]} {cat_info[0]}</span>
+      <span class="hero-score" style="background:{badge_color}">{badge_label}</span>
     </div>
   </div>
 </div>'''
