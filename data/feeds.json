@@ -659,6 +659,86 @@
       "name": "Google News AI EU",
       "url": "https://news.google.com/rss/search?q=EU+AI+Act+OR+European+AI+regulation+OR+AI+Europe&hl=en&gl=US&ceid=US:en",
       "tier": 2
+    },
+    {
+      "name": "TechNode",
+      "url": "https://technode.com/feed/",
+      "tier": 2
+    },
+    {
+      "name": "PingWest",
+      "url": "https://en.pingwest.com/feed",
+      "tier": 2
+    },
+    {
+      "name": "36Kr English",
+      "url": "https://36kr.com/feed",
+      "tier": 2
+    },
+    {
+      "name": "Google News AI China",
+      "url": "https://news.google.com/rss/search?q=China+AI+Baidu+Alibaba+ByteDance+Tencent&hl=en&gl=US&ceid=US:en",
+      "tier": 2
+    },
+    {
+      "name": "Politico EU Tech",
+      "url": "https://www.politico.eu/feed/",
+      "tier": 1
+    },
+    {
+      "name": "Euractiv Digital",
+      "url": "https://www.euractiv.com/sections/digital/feed/",
+      "tier": 2
+    },
+    {
+      "name": "The Register",
+      "url": "https://www.theregister.com/headlines.atom",
+      "tier": 2
+    },
+    {
+      "name": "Google News AI Europe",
+      "url": "https://news.google.com/rss/search?q=AI+Europe+regulation+EU+startup&hl=en&gl=US&ceid=US:en",
+      "tier": 2
+    },
+    {
+      "name": "Google News KI Deutschland",
+      "url": "https://news.google.com/rss/search?q=KI+Deutschland+Startup+Forschung&hl=de&gl=DE&ceid=DE:de",
+      "tier": 2
+    },
+    {
+      "name": "Stanford HAI",
+      "url": "https://hai.stanford.edu/news/rss.xml",
+      "tier": 1
+    },
+    {
+      "name": "Brookings Tech",
+      "url": "https://www.brookings.edu/topic/technology-innovation/feed/",
+      "tier": 2
+    },
+    {
+      "name": "Future of Life Institute",
+      "url": "https://futureoflife.org/feed/",
+      "tier": 2
+    },
+    {
+      "name": "Google News AI Regulation",
+      "url": "https://news.google.com/rss/search?q=%22AI+regulation%22+OR+%22AI+Act%22+OR+%22AI+governance%22+OR+%22AI+safety%22&hl=en&gl=US&ceid=US:en",
+      "tier": 2
+    },
+    {
+      "name": "Hugging Face Papers",
+      "url": "https://huggingface.co/papers/rss",
+      "tier": 2
+    },
+    {
+      "name": "HomeKit Authority",
+      "url": "https://homekitauthority.com/feed/",
+      "tier": 2
+    },
+    {
+      "name": "Matter Blog",
+      "url": "https://csa-iot.org/feed/",
+      "tier": 2
     }
   ],
   "keywords": {

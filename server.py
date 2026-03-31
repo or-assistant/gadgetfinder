@@ -892,8 +892,8 @@ def index(request: Request):
             pass
         # Cap display score at 100
         a["score"] = min(100, a["score"])
-        # Minimum display threshold: skip very low-quality
-        if a["score"] < 25 and vote != 1:
+        # Only show Good (60+) and Hot (80+) articles — no mid/low noise
+        if a["score"] < 60 and vote != 1:
             continue
         all_articles.append(a)
     db.close()
