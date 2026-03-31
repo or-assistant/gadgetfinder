@@ -228,14 +228,22 @@ def compute_score(title, summary, source, brand, image_url, cfg):
     # Reddit community bonus
     if source.startswith('r/'):
         s += _POPULAR_SUBS.get(source, 5)
-    # Reddit noise penalty: personal posts, questions, low-effort
-    _REDDIT_NOISE = ['i just want', 'how are you', 'what do you think',
-                     'is it worth', 'should i ', 'help me ', 'does anyone',
-                     'am i the only', 'tips on ', 'has anyone']
+    # Reddit: treat as community signal, not primary news source
+    # Cap Reddit base score — they shouldn't outrank actual journalism
     if source.startswith('r/'):
+        s = min(s, 65)  # Hard cap before position bonus
+        # Noise penalty for personal/discussion/question posts
+        _REDDIT_NOISE = ['i just', 'i tried', 'i tested', 'i built', 'i made',
+                         'i want', 'i need', 'my ', 'anyone', 'how do',
+                         'how are you', 'what do you', 'which ', 'is it worth',
+                         'should i ', 'help me ', 'does anyone', 'can someone',
+                         'am i the only', 'tips on ', 'has anyone', 'looking for',
+                         'thoughts on', 'unpopular opinion', 'rant', 'eli5',
+                         '[d]', '[p]', 'rate my', 'system question',
+                         'vs ', 'versus ']
         for rn in _REDDIT_NOISE:
             if rn in text:
-                s -= 25
+                s -= 20
                 break
     return max(0, min(200, s))
 
@@ -419,9 +427,9 @@ def fetch_feeds():
             else:
                 published = datetime.now(timezone.utc).isoformat()
             score = compute_score(title, summary, source, brand, image_url, cfg)
-            # Reddit position bonus: top posts in /hot/ get extra points
+            # Reddit position bonus (reduced — Reddit is signal, not primary source)
             if source.startswith("r/"):
-                position_bonus = max(0, 25 - entry_idx)  # #1 = +25, #10 = +15, #25 = 0
+                position_bonus = max(0, 10 - entry_idx)  # #1 = +10, #5 = +5, #10 = 0
                 score += position_bonus
             # Skip very low-quality articles
             if score < 15:
@@ -771,22 +779,24 @@ def index(request: Request):
             a["score"] = a.get("score", 0) + 50
         elif vote == -1:
             a["score"] = max(0, a.get("score", 0) - 30)
-        # Recency boost: fresh articles get significant boost, old ones decay
+        # Recency boost: fresh articles get boost, old ones decay
+        # Reddit gets half the recency boost (community signal, not breaking news)
         try:
             pub = datetime.fromisoformat(a.get("published", ""))
             if pub.tzinfo is None:
                 pub = pub.replace(tzinfo=timezone.utc)
             age_hours = (now_ts - pub).total_seconds() / 3600
+            is_reddit = a.get("source", "").startswith("r/")
             if age_hours < 6:
-                a["score"] += 30      # Breaking: massive boost
+                a["score"] += 15 if is_reddit else 30
             elif age_hours < 12:
-                a["score"] += 20      # Very fresh
+                a["score"] += 10 if is_reddit else 20
             elif age_hours < 24:
-                a["score"] += 12      # Today
+                a["score"] += 5 if is_reddit else 12
             elif age_hours < 48:
-                a["score"] += 5       # Yesterday: small boost
+                a["score"] += 2 if is_reddit else 5
             elif age_hours > 96:
-                a["score"] -= 15      # Older than 4 days: decay
+                a["score"] -= 15
         except (ValueError, TypeError):
             pass
         # Minimum display threshold: skip very low-quality

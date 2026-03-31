@@ -263,12 +263,12 @@
     {
       "name": "r/MachineLearning",
       "url": "https://www.reddit.com/r/MachineLearning/hot/.rss",
-      "tier": 1
+      "tier": 2
     },
     {
       "name": "r/LocalLLaMA",
       "url": "https://www.reddit.com/r/LocalLLaMA/hot/.rss",
-      "tier": 1
+      "tier": 2
     },
     {
       "name": "r/artificial",
@@ -318,7 +318,7 @@
     {
       "name": "r/gadgets",
       "url": "https://www.reddit.com/r/gadgets/hot/.rss",
-      "tier": 1
+      "tier": 2
     },
     {
       "name": "r/headphones",
@@ -358,7 +358,7 @@
     {
       "name": "r/technology",
       "url": "https://www.reddit.com/r/technology/hot/.rss",
-      "tier": 1
+      "tier": 2
     },
     {
       "name": "r/hardware",
