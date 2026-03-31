@@ -726,27 +726,10 @@ a{color:var(--text);text-decoration:none}
 .badge-score{color:#fff}
 .badge-brand{background:var(--brand-bg);color:var(--brand-text)}
 .badge-new{background:rgba(255,214,10,0.12);color:#ffd60a}
-/* Compact cards */
-.compact-card{display:flex;align-items:center;gap:10px;padding:10px 12px;
-  border-bottom:1px solid var(--border);text-decoration:none;color:var(--text);
-  transition:background .15s ease}
-.compact-card:hover{background:var(--hover)}
-.compact-emoji{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;
-  justify-content:center;font-size:15px;flex-shrink:0}
-.compact-title{flex:1;font-size:14px;font-weight:500;line-height:1.4;min-width:0;
-  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-@media(min-width:768px){.compact-title{white-space:normal;display:-webkit-box;
-  -webkit-line-clamp:1;-webkit-box-orient:vertical}}
-.compact-meta{display:flex;align-items:center;gap:6px;flex-shrink:0;font-size:11px;color:var(--secondary)}
-.compact-source{max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-/* Load more */
-.load-more{display:block;width:100%;padding:10px;margin:8px 0 16px;border:1px solid var(--border);
-  border-radius:8px;background:transparent;color:var(--secondary);font-family:inherit;
-  font-size:13px;cursor:pointer;transition:all .2s ease;text-align:center}
-.load-more:hover{border-color:var(--accent);color:var(--text);background:var(--hover)}
 /* Date separator */
-.date-sep{font-size:13px;font-weight:600;color:var(--text);
-  margin:20px 0 8px;padding-left:4px;display:flex;align-items:center;gap:10px}
+.date-sep{font-size:12px;font-weight:500;color:var(--secondary);
+  margin:20px 0 10px;padding-left:4px;display:flex;align-items:center;gap:10px;
+  grid-column:1/-1}
 .date-sep::after{content:'';flex:1;height:1px;background:var(--border)}
 /* Footer */
 .footer{text-align:center;padding:32px 0 16px;font-size:13px;color:var(--secondary)}
@@ -822,25 +805,6 @@ def render_hero(article, params):
     </div>
   </div>
 </div>'''
-
-def render_compact_card(article):
-    """Compact card: emoji dot + title + source. No summary."""
-    title = esc(strip_dashes(clean_reddit_title(article["title"], article.get("source", ""))))
-    emoji, c1, c2 = get_article_emoji(article)
-    badge_label, badge_color = score_badge(article["score"])
-    date_str = format_date(article.get("published", ""))
-    brand_html = (f' <span class="badge badge-brand">{esc(article["brand"])}</span>'
-                  if article["brand"] else "")
-    return f'''<a href="{esc(article["url"])}" target="_blank" rel="noopener" class="compact-card" data-searchable>
-  <span class="compact-emoji" style="background:linear-gradient(135deg,{c1},{c2})">{emoji}</span>
-  <span class="compact-title">{title}</span>
-  <span class="compact-meta">
-    {brand_html}
-    {"<span class='badge badge-score' style='background:" + badge_color + "'>" + badge_label + "</span>" if badge_label else ""}
-    <span class="compact-source">{esc(article["source"])}</span>
-  </span>
-</a>'''
-
 
 def render_card(article):
     title = esc(strip_dashes(clean_reddit_title(article["title"], article.get("source", ""))))
@@ -1092,43 +1056,20 @@ def index(request: Request):
     if not feed:
         parts.append('<div class="empty">Keine Artikel gefunden. Versuche andere Filter.</div>')
     else:
-        # 1 Hero (top article)
-        hero = feed[0]
-        rest = feed[1:]
-        parts.append(render_hero(hero, params))
+        # Hero row: top 3 articles
+        hero_count = min(3, len(feed))
+        heroes = feed[:hero_count]
+        rest = feed[hero_count:]
 
-        # Group rest by date sections
-        today_articles = []
-        yesterday_articles = []
-        older_articles = []
+        parts.append('<div class="hero-row">')
+        for h in heroes:
+            parts.append(render_hero(h, params))
+        parts.append('</div>')
+
+        parts.append('<div class="card-grid">')
         for a in rest:
-            d = format_date(a.get("published", ""))
-            if "Heute" in d or "Gerade" in d:
-                today_articles.append(a)
-            elif "Gestern" in d:
-                yesterday_articles.append(a)
-            else:
-                older_articles.append(a)
-
-        # Render sections with compact cards
-        initial_limit = 10  # Show max 10 per section initially
-        section_id = 0
-        for label, items in [("Heute", today_articles), ("Gestern", yesterday_articles), ("Diese Woche", older_articles)]:
-            if not items:
-                continue
-            section_id += 1
-            parts.append(f'<div class="date-sep"><span>{label} ({len(items)})</span></div>')
-            visible = items[:initial_limit]
-            hidden = items[initial_limit:]
-            for a in visible:
-                parts.append(render_compact_card(a))
-            if hidden:
-                parts.append(f'<div id="more-{section_id}" style="display:none">')
-                for a in hidden:
-                    parts.append(render_compact_card(a))
-                parts.append('</div>')
-                parts.append(f'<button class="load-more" onclick="document.getElementById(\'more-{section_id}\').style.display=\'block\';this.remove()">'
-                             f'{len(hidden)} weitere anzeigen</button>')
+            parts.append(render_card(a))
+        parts.append('</div>')
 
     parts.append(f'''
 <div class="footer">
