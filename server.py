@@ -106,6 +106,71 @@ AI_SUBCATEGORIES = {
 }
 
 
+# Region detection for AI articles
+REGION_FILTERS = {
+    "usa":   ("\U0001f1fa\U0001f1f8 USA", [
+        "openai", "anthropic", "google", "meta ", "microsoft", "nvidia",
+        "silicon valley", "san francisco", "washington", "california",
+        "us ", "u.s.", "american", "apple", "amazon", "tesla",
+        "congress", "senate", "white house", "pentagon", "darpa",
+        "stanford", "mit ", "berkeley", "carnegie mellon",
+    ]),
+    "china": ("\U0001f1e8\U0001f1f3 China", [
+        "china", "chinese", "beijing", "shanghai", "shenzhen", "alibaba",
+        "baidu", "tencent", "huawei", "bytedance", "xiaomi", "deepseek",
+        "qwen", "yi-", "zhipu", "moonshot", "01.ai", "minimax",
+        "sensetime", "iflytek", "jinan", "wuhan",
+        "pandaily", "south china",
+    ]),
+    "europe": ("\U0001f1ea\U0001f1fa Europa", [
+        "europe", "european", "eu ", "eu-", "brussels", "bruessel",
+        "gdpr", "dsgvo", "ai act", "digital market", "digital services",
+        "mistral", "aleph alpha", "deepl", "sap", "siemens",
+        "germany", "german", "deutschland", "france", "french",
+        "uk ", "british", "london", "berlin", "paris", "amsterdam",
+        "stockholm", "helsinki", "zurich", "switzerland", "swiss",
+        "handelsblatt", "heise", "t3n", "golem", "sifted", "tech.eu",
+        "kuenstliche intelligenz", "ki-", " ki ",
+    ]),
+    "regulation": ("\u2696\ufe0f Regulierung", [
+        "regulation", "regulat", "compliance", "law ", "legal",
+        "legislation", "policy", "governance", "ethics", "ethical",
+        "ai act", "executive order", "copyright", "liability",
+        "safety", "alignment", "guardrail", "oversight", "audit",
+        "bias", "fairness", "transparency", "accountab",
+        "gdpr", "dsgvo", "digital market", "antitrust",
+        "ban ", "banned", "restrict", "prohibit",
+    ]),
+}
+
+# Chinese sources auto-tag
+_CHINA_SOURCES = {"pandaily (china tech)", "south china morning post ai", "tech in asia"}
+_EUROPE_SOURCES = {"handelsblatt tech", "heise ki", "t3n", "golem.de", "sifted (eu tech)",
+                   "tech.eu", "ai news eu", "google news ki de", "google news ai eu"}
+_USA_SOURCES = {"openai blog", "google ai blog", "google research blog", "microsoft ai blog",
+                "deepmind blog", "meta research"}
+
+def detect_region(title, summary, source=""):
+    """Detect regions for an article. Returns set of region keys."""
+    text = f"{title} {summary or ''}".lower()
+    src_lower = source.lower()
+    regions = set()
+    # Source-based auto-tag
+    if src_lower in _CHINA_SOURCES:
+        regions.add("china")
+    if src_lower in _EUROPE_SOURCES:
+        regions.add("europe")
+    if src_lower in _USA_SOURCES:
+        regions.add("usa")
+    # Keyword-based detection
+    for key, (_, keywords) in REGION_FILTERS.items():
+        for kw in keywords:
+            if kw in text or kw in src_lower:
+                regions.add(key)
+                break
+    return regions
+
+
 def detect_ai_subcategory(title, summary, source=""):
     """Detect AI subcategory from title+summary+source text. Returns key or None."""
     text = f"{title} {summary or ''} {source}".lower()
@@ -795,6 +860,7 @@ def index(request: Request):
     active_cat = params.get("cat")
     active_brand = params.get("brand")
     active_sub = params.get("sub")
+    active_region = params.get("region")
 
     cfg = load_config()
     db = get_db()
@@ -844,6 +910,10 @@ def index(request: Request):
         if active_sub and active_sub in AI_SUBCATEGORIES:
             articles = [a for a in articles
                         if detect_ai_subcategory(a["title"], a["summary"], a.get("source","")) == active_sub]
+        # Apply region filter
+        if active_region and active_region in REGION_FILTERS:
+            articles = [a for a in articles
+                        if active_region in detect_region(a["title"], a["summary"], a.get("source",""))]
     else:
         articles = [a for a in all_articles if a["category"] not in {"ai", "quantum", "science"}]
         # Apply category filter
@@ -931,14 +1001,29 @@ def index(request: Request):
 
     # Filter chips
     if active_tab == "ai":
+        # Subcategory chips
         parts.append('<div class="chip-row">')
-        base_params = {"tab": "ai"}
+        base_params = dict(params)
+        base_params["tab"] = "ai"
+        base_params.pop("cat", None)
+        base_params.pop("brand", None)
+        sub_base = {k: v for k, v in base_params.items() if k != "sub"}
         parts.append(f'<a class="chip{"" if active_sub else " on"}" '
-                     f'href="{build_filter_url(base_params, "sub", None)}">Alle</a>')
+                     f'href="{build_filter_url(sub_base, "sub", None)}">Alle</a>')
         for skey, (slabel, _) in AI_SUBCATEGORIES.items():
             on = " on" if active_sub == skey else ""
-            href = build_filter_url(base_params, "sub", skey)
+            href = build_filter_url(sub_base, "sub", skey)
             parts.append(f'<a class="chip{on}" href="{href}">{slabel}</a>')
+        parts.append('</div>')
+        # Region chips (second row)
+        parts.append('<div class="chip-row" style="padding-top:4px">')
+        reg_base = {k: v for k, v in base_params.items() if k != "region"}
+        parts.append(f'<a class="chip{"" if active_region else " on"}" '
+                     f'href="{build_filter_url(reg_base, "region", None)}">\U0001f30d Alle Regionen</a>')
+        for rkey, (rlabel, _) in REGION_FILTERS.items():
+            on = " on" if active_region == rkey else ""
+            href = build_filter_url(reg_base, "region", rkey)
+            parts.append(f'<a class="chip{on}" href="{href}">{rlabel}</a>')
         parts.append('</div>')
     else:
         parts.append('<div class="chip-row">')
