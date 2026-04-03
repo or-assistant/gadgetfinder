@@ -51,11 +51,6 @@
       "tier": 2
     },
     {
-      "name": "GSMArena",
-      "url": "https://www.gsmarena.com/rss-news-reviews.php3",
-      "tier": 2
-    },
-    {
       "name": "Engadget",
       "url": "https://www.engadget.com/rss.xml",
       "tier": 3
@@ -451,43 +446,8 @@
       "tier": 2
     },
     {
-      "name": "Weights & Biases Blog",
-      "url": "https://wandb.ai/site/blog/feed.xml",
-      "tier": 2
-    },
-    {
-      "name": "LMSys (Chatbot Arena)",
-      "url": "https://blog.lmsys.org/feed.xml",
-      "tier": 1
-    },
-    {
-      "name": "Nous Research Blog",
-      "url": "https://nousresearch.com/blog/feed/",
-      "tier": 2
-    },
-    {
-      "name": "Together AI Blog",
-      "url": "https://www.together.ai/blog/feed",
-      "tier": 2
-    },
-    {
-      "name": "Moore's Law Is Dead",
-      "url": "https://mooreslawisd.com/feed/",
-      "tier": 2
-    },
-    {
       "name": "Fabricated Knowledge",
       "url": "https://www.fabricatedknowledge.com/feed",
-      "tier": 2
-    },
-    {
-      "name": "rtings.com Reviews",
-      "url": "https://www.rtings.com/rss/reviews.xml",
-      "tier": 1
-    },
-    {
-      "name": "Scarbir (TWS earbuds)",
-      "url": "https://www.scarbir.com/feed",
       "tier": 2
     },
     {
@@ -496,28 +456,8 @@
       "tier": 2
     },
     {
-      "name": "South China Morning Post AI",
-      "url": "https://www.scmp.com/rss/5/topic/artificial-intelligence/feed",
-      "tier": 2
-    },
-    {
       "name": "Pandaily (China Tech)",
       "url": "https://pandaily.com/feed/",
-      "tier": 2
-    },
-    {
-      "name": "Analytics India Magazine",
-      "url": "https://analyticsindiamag.com/feed/",
-      "tier": 2
-    },
-    {
-      "name": "Arabian Business Tech",
-      "url": "https://www.arabianbusiness.com/technology/feed",
-      "tier": 3
-    },
-    {
-      "name": "Tech in Asia",
-      "url": "https://www.techinasia.com/feed",
       "tier": 2
     },
     {
@@ -533,46 +473,6 @@
     {
       "name": "Tech.eu",
       "url": "https://tech.eu/feed/",
-      "tier": 2
-    },
-    {
-      "name": "Google News AI",
-      "url": "https://news.google.com/rss/search?q=artificial+intelligence+OR+machine+learning+OR+LLM&hl=en&gl=US&ceid=US:en",
-      "tier": 2
-    },
-    {
-      "name": "Google News Gadgets",
-      "url": "https://news.google.com/rss/search?q=gadget+review+OR+tech+review+OR+new+device&hl=en&gl=US&ceid=US:en",
-      "tier": 2
-    },
-    {
-      "name": "Google News Quantum",
-      "url": "https://news.google.com/rss/search?q=quantum+computing+OR+quantum+processor&hl=en&gl=US&ceid=US:en",
-      "tier": 2
-    },
-    {
-      "name": "Google News KI DE",
-      "url": "https://news.google.com/rss/search?q=k%C3%BCnstliche+intelligenz+OR+KI+startup&hl=de&gl=DE&ceid=DE:de",
-      "tier": 2
-    },
-    {
-      "name": "Google News AI Agents",
-      "url": "https://news.google.com/rss/search?q=%22AI+agent%22+OR+%22agentic+AI%22+OR+%22autonomous+AI%22&hl=en&gl=US&ceid=US:en",
-      "tier": 2
-    },
-    {
-      "name": "Google News Open Source AI",
-      "url": "https://news.google.com/rss/search?q=%22open+source%22+AI+model+OR+Hugging+Face+OR+Ollama&hl=en&gl=US&ceid=US:en",
-      "tier": 2
-    },
-    {
-      "name": "Google News AI Hardware",
-      "url": "https://news.google.com/rss/search?q=NVIDIA+GPU+OR+AI+chip+OR+TPU+OR+neural+processor&hl=en&gl=US&ceid=US:en",
-      "tier": 2
-    },
-    {
-      "name": "Google News VR AR",
-      "url": "https://news.google.com/rss/search?q=VR+headset+OR+AR+glasses+OR+mixed+reality+OR+Vision+Pro&hl=en&gl=US&ceid=US:en",
       "tier": 2
     },
     {
@@ -611,16 +511,6 @@
       "tier": 1
     },
     {
-      "name": "The Information",
-      "url": "https://www.theinformation.com/feed",
-      "tier": 1
-    },
-    {
-      "name": "Protocol/Semafor Tech",
-      "url": "https://www.semafor.com/feed/tech",
-      "tier": 2
-    },
-    {
       "name": "Platformer",
       "url": "https://www.platformer.news/rss/",
       "tier": 2
@@ -651,23 +541,8 @@
       "tier": 2
     },
     {
-      "name": "Transformer Circuits",
-      "url": "https://transformer-circuits.pub/rss.xml",
-      "tier": 1
-    },
-    {
-      "name": "Google News AI EU",
-      "url": "https://news.google.com/rss/search?q=EU+AI+Act+OR+European+AI+regulation+OR+AI+Europe&hl=en&gl=US&ceid=US:en",
-      "tier": 2
-    },
-    {
       "name": "TechNode",
       "url": "https://technode.com/feed/",
-      "tier": 2
-    },
-    {
-      "name": "PingWest",
-      "url": "https://en.pingwest.com/feed",
       "tier": 2
     },
     {
@@ -676,19 +551,9 @@
       "tier": 2
     },
     {
-      "name": "Google News AI China",
-      "url": "https://news.google.com/rss/search?q=China+AI+Baidu+Alibaba+ByteDance+Tencent&hl=en&gl=US&ceid=US:en",
-      "tier": 2
-    },
-    {
       "name": "Politico EU Tech",
       "url": "https://www.politico.eu/feed/",
       "tier": 1
-    },
-    {
-      "name": "Euractiv Digital",
-      "url": "https://www.euractiv.com/sections/digital/feed/",
-      "tier": 2
     },
     {
       "name": "The Register",
@@ -696,38 +561,8 @@
       "tier": 2
     },
     {
-      "name": "Google News AI Europe",
-      "url": "https://news.google.com/rss/search?q=AI+Europe+regulation+EU+startup&hl=en&gl=US&ceid=US:en",
-      "tier": 2
-    },
-    {
-      "name": "Google News KI Deutschland",
-      "url": "https://news.google.com/rss/search?q=KI+Deutschland+Startup+Forschung&hl=de&gl=DE&ceid=DE:de",
-      "tier": 2
-    },
-    {
-      "name": "Stanford HAI",
-      "url": "https://hai.stanford.edu/news/rss.xml",
-      "tier": 1
-    },
-    {
-      "name": "Brookings Tech",
-      "url": "https://www.brookings.edu/topic/technology-innovation/feed/",
-      "tier": 2
-    },
-    {
       "name": "Future of Life Institute",
       "url": "https://futureoflife.org/feed/",
-      "tier": 2
-    },
-    {
-      "name": "Google News AI Regulation",
-      "url": "https://news.google.com/rss/search?q=%22AI+regulation%22+OR+%22AI+Act%22+OR+%22AI+governance%22+OR+%22AI+safety%22&hl=en&gl=US&ceid=US:en",
-      "tier": 2
-    },
-    {
-      "name": "Hugging Face Papers",
-      "url": "https://huggingface.co/papers/rss",
       "tier": 2
     },
     {
@@ -739,6 +574,51 @@
       "name": "Matter Blog",
       "url": "https://csa-iot.org/feed/",
       "tier": 2
+    },
+    {
+      "name": "Product Hunt",
+      "url": "https://www.producthunt.com/feed",
+      "tier": 1
+    },
+    {
+      "name": "Gadgets 360",
+      "url": "https://feeds.feedburner.com/gadgets360-latest",
+      "tier": 1
+    },
+    {
+      "name": "ecoustics",
+      "url": "https://ecoustics.com/feed/",
+      "tier": 2
+    },
+    {
+      "name": "Head-Fi News",
+      "url": "https://www.head-fi.org/forums/-/index.rss",
+      "tier": 2
+    },
+    {
+      "name": "StereoNET",
+      "url": "https://www.stereonet.com/feeds/news.rss",
+      "tier": 2
+    },
+    {
+      "name": "Anthropic News",
+      "url": "https://www.anthropic.com/news/rss",
+      "tier": 1
+    },
+    {
+      "name": "Papers With Code",
+      "url": "https://paperswithcode.com/latest.rss",
+      "tier": 1
+    },
+    {
+      "name": "Artificial Analysis",
+      "url": "https://artificialanalysis.ai/feed.xml",
+      "tier": 1
+    },
+    {
+      "name": "LMSYS Org Blog",
+      "url": "https://lmsys.org/blog/feed.xml",
+      "tier": 1
     }
   ],
   "keywords": {

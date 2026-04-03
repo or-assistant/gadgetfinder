@@ -711,8 +711,10 @@ a{color:var(--text);text-decoration:none}
 .card-emoji{width:52px;height:52px;border-radius:12px;display:flex;align-items:center;
   justify-content:center;font-size:24px;flex-shrink:0}
 .card-content{flex:1;min-width:0}
+.card-tags{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:5px}
+.badge-sub{background:rgba(255,255,255,.08);color:var(--secondary);font-size:11px;padding:2px 8px;border-radius:4px}
 .card-title{font-size:15px;font-weight:600;line-height:1.4;margin-bottom:4px;
-  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:break-word}
+  display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;word-break:break-word}
 .card-title a{color:var(--text);transition:color .2s ease}
 .card-title a:hover{color:var(--accent)}
 .card-summary{font-size:13px;color:var(--secondary);line-height:1.45;margin-bottom:8px;
@@ -731,16 +733,17 @@ a{color:var(--text);text-decoration:none}
 .badge-brand{background:var(--brand-bg);color:var(--brand-text)}
 .badge-new{background:rgba(255,214,10,0.12);color:#ffd60a}
 /* Compact cards */
-.compact-card{display:flex;align-items:center;gap:10px;padding:10px 12px;
+.compact-card{display:flex;align-items:flex-start;gap:10px;padding:12px 14px;
   border-bottom:1px solid var(--border);text-decoration:none;color:var(--text);
   transition:background .15s ease}
 .compact-card:hover{background:var(--hover)}
 .compact-emoji{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;
   justify-content:center;font-size:15px;flex-shrink:0}
-.compact-title{flex:1;font-size:14px;font-weight:500;line-height:1.4;min-width:0;
-  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.compact-meta{display:flex;align-items:center;gap:6px;flex-shrink:0;font-size:11px;color:var(--secondary)}
-.compact-source{max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.compact-body{flex:1;min-width:0}
+.compact-badges{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:3px}
+.compact-title{font-size:15px;font-weight:600;line-height:1.4;margin-bottom:2px;word-break:break-word}
+.compact-bottom{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--secondary);margin-top:3px}
+.compact-source{}
 /* Sidebar */
 .sb-section{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:12px}
 .sb-title{font-size:13px;font-weight:700;color:var(--text);margin-bottom:12px;letter-spacing:.02em}
@@ -844,13 +847,16 @@ def render_compact_card(article):
     date_str = format_date(article.get("published", ""))
     brand_html = (f' <span class="badge badge-brand">{esc(article["brand"])}</span>'
                   if article["brand"] else "")
+    subcat = detect_ai_subcategory(article["title"], article.get("summary",""), article.get("source","")) if article.get("category") in ("ai","quantum","science") else article.get("category","")
+    subcat_labels = {"models":"Modelle","agentic":"Agentic AI","opensource":"Open Source","europe":"Europa","hardware":"Hardware","multimedia":"Multimedia","quantum":"Quantum","science":"Forschung","audio":"Audio","mobile":"Mobile","gaming":"Gaming","computer":"Computer","vr":"VR/AR","smarthome":"Smart Home","wearables":"Wearables","gadgets":"Gadgets"}
+    sub_html = f'<span class="badge badge-sub">{subcat_labels.get(subcat,"")}</span>' if subcat_labels.get(subcat) else ""
+    score_html = f'<span class="badge badge-score" style="background:{badge_color}">{badge_label}</span>' if badge_label else ""
     return f'''<a href="{esc(article["url"])}" target="_blank" rel="noopener" class="compact-card" data-searchable>
   <span class="compact-emoji" style="background:linear-gradient(135deg,{c1},{c2})">{emoji}</span>
-  <span class="compact-title">{title}</span>
-  <span class="compact-meta">
-    {brand_html}
-    {"<span class='badge badge-score' style='background:" + badge_color + "'>" + badge_label + "</span>" if badge_label else ""}
-    <span class="compact-source">{esc(article["source"])}</span>
+  <span class="compact-body">
+    <span class="compact-badges">{score_html}{sub_html}{brand_html}</span>
+    <span class="compact-title">{title}</span>
+    <span class="compact-bottom"><span class="compact-source">{esc(article["source"])}</span> <span>{date_str}</span></span>
   </span>
 </a>'''
 
@@ -878,16 +884,20 @@ def render_card(article):
     if price is not None:
         price_html = f" &middot; {price}\u20ac"
     date_str = format_date(article.get("published", ""))
+    # Subcategory label
+    subcat = detect_ai_subcategory(article["title"], article.get("summary",""), article.get("source","")) if article.get("category") in ("ai","quantum","science") else article.get("category","")
+    subcat_labels = {"models":"Modelle","agentic":"Agentic AI","opensource":"Open Source","europe":"Europa","hardware":"Hardware","multimedia":"Multimedia","quantum":"Quantum","science":"Forschung","audio":"Audio","mobile":"Mobile","gaming":"Gaming","computer":"Computer","vr":"VR/AR","smarthome":"Smart Home","wearables":"Wearables","gadgets":"Gadgets"}
+    subcat_label = subcat_labels.get(subcat, "")
+    score_html = f"<span class='badge badge-score' style='background:{badge_color}'>{badge_label}</span>" if badge_label else ""
     return f'''<div class="card" data-searchable>
   <div class="card-emoji" style="background:linear-gradient(135deg,{c1},{c2})">{emoji}</div>
   <div class="card-content">
+    <div class="card-tags">{score_html}{"<span class='badge badge-sub'>" + subcat_label + "</span>" if subcat_label else ""}{brand_html}</div>
     <div class="card-title"><a href="{esc(article["url"])}" target="_blank" rel="noopener">{title}</a></div>
     <div class="card-summary">{summary}</div>
     <div class="card-bottom">
       <span class="card-dot" style="background:{source_color}"></span>
       <span>{esc(article["source"])}</span>
-      {brand_html}
-      {"<span class='badge badge-score' style='background:" + badge_color + "'>" + badge_label + " " + str(article["score"]) + "</span>" if badge_label else ""}
       {new_html}
       <span>{date_str}{price_html}</span>
       <span class="card-vote">
